@@ -36,6 +36,8 @@ void setAway();
 
 void unAway();
 
+boolean ircConnected();
+
 boolean ircConnected(boolean in_progress);
 
 void ircDisconnect();
@@ -85,5 +87,7 @@ void ircDebug (const __FlashStringHelper *line);
 void ircDebug (const char *line);
 
 void ircSetDebug(void (*fp)(const char *));
+
+void stringRemoveNonAlphaNum(char *str);
 
 #endif

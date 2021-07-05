@@ -1,7 +1,7 @@
 #include "irc_client.h"
 #include <ETH.h>
 
-//#define DEBUG_IRC
+#define DEBUG_IRC
 //#define DEBUG_IRC_VERBOSE
 #define IRC_BUFSIZE 200  //bytes (default 200)
 #define IRC_RECONNECT_INTERVAL 60000  //milliseconds
@@ -25,7 +25,7 @@ int _irc_input_buffer_pointer = 0;
 unsigned long _line_start_time = 0;
 char _nickserv_password[20] = "";
 char _irc_nick[20] = "irc_client";
-char _version[20] = "irc client";
+char _version[32] = "irc client";
 char _irc_server[32] = "";
 int _irc_server_port = 6667;
 
@@ -61,7 +61,10 @@ boolean ircConnect(const char * server, int port, boolean reconnect) {
       snprintf_P(buf, sizeof(buf), PSTR("Connected to %s:%u"), server, port);
       ircDebug(buf);
       ethClient_irc.print(F("USER "));
-      ethClient_irc.print(_irc_nick);
+	  //remove illegal characters from username
+	  snprintf(buf, sizeof(buf), "%s", _irc_nick);
+	  stringRemoveNonAlphaNum(buf);
+      ethClient_irc.print(buf);
       ethClient_irc.print(F(" 8 * :"));
       ethClient_irc.print(_version);
       ethClient_irc.print(F("\r\nNICK "));
@@ -118,7 +121,10 @@ void doIRC() {
       snprintf_P(buf, sizeof(buf), PSTR("Connected to %s:%u"), _irc_server, _irc_server_port);
       ircDebug(buf);
       ethClient_irc.print(F("USER "));
-      ethClient_irc.print(_irc_nick);
+	  //remove illegal characters from username
+      snprintf(buf, sizeof(buf), "%s", _irc_nick);
+      stringRemoveNonAlphaNum(buf);
+      ethClient_irc.print(buf);
       ethClient_irc.print(F(" 8 * :"));
       ethClient_irc.print(_version);
       ethClient_irc.print(F("\r\nNICK "));
@@ -133,7 +139,9 @@ void doIRC() {
   if (ethClient_irc.connected()) {
     if (strlen(_nickserv_password) > 0 && _irc_identified == NOT_IDENTIFIED && _irc_pinged) {  // we've pinged and nickserv wants auth, now identify with nickserv
       ircNetworkLight();
+	  #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
       ircDebug(F("Identifying..."));
+	  #endif
       char buf[50];
       snprintf_P(buf, sizeof(buf), PSTR("identify %s"), _nickserv_password);
       sendIRCMessage("nickserv", buf);
@@ -141,7 +149,9 @@ void doIRC() {
     }
     if (!_irc_performed_on_connect && _irc_pinged && (_irc_identified == IDENTIFY_CONFIRMED || millis() - _irc_last_connect_attempt > NICKSERV_TIMEOUT)) {  //we're identified (or timed out), now join channels
       if (_irc_identified != IDENTIFY_CONFIRMED) {
-        ircDebug(F("NickServ timed out!"));
+        #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+		ircDebug(F("NickServ timed out!"));
+		#endif
         _irc_identified = WAITING_FOR_NICKSERV;
       }
       #ifdef DEBUG_IRC
@@ -318,17 +328,19 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
           pch = strstr_P(message, "This nickname is registered and protected.");  //
           if (pch != NULL) {
             _irc_identified = NOT_IDENTIFIED;
+			#ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
             ircDebug(F("Nickserv wants auth."));
             if (strlen(_nickserv_password) == 0) {
               ircDebug(F("WARNING: No nickserv password is set!\r\n"));
             }
+			#endif
             return;
           }
           char buf[100];
           snprintf_P(buf, sizeof(buf), PSTR("Ignoring NiceServ NOTICE: %s"), message);
           ircDebug(buf);
-          return;        
-        }
+          return;
+	    }
         //some other private notice
         #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
         ircNetworkLight();
@@ -376,9 +388,11 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
       strcat(test_string, _irc_nick);
       pch = strstr_P(message, test_string);
       if (pch != NULL) {
+		#ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
         char buf[100];
         snprintf_P(buf, sizeof(buf), PSTR("Got voice on %s"), to);
         ircDebug(buf);
+		#endif
         ircOnVoice(from, to);
         return;
       }
@@ -386,9 +400,11 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
       strcat(test_string, _irc_nick);
       pch = strstr_P(message, test_string);
       if (pch != NULL) {
+		#ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
         char buf[100];
         snprintf_P(buf, sizeof(buf), PSTR("Got ops on %s"), to);
         ircDebug(buf);
+		#endif
         ircOnOp(from, to);
         return;
       }
@@ -417,28 +433,31 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
     int err = atoi(type);
     if (err >= 400 && err <= 502) {
       ircNetworkLight();
-      char buf[40];
-      snprintf_P(buf, sizeof(buf), PSTR("Message is an error: %i"), err);
-      ircDebug(buf);
+      char error_string[100];
       if (err >= 401 && err <= 403) {
-        ircDebug(F(" Target does not exist.\r\n"));
+        snprintf_P(error_string, sizeof(error_string), PSTR("Target does not exist."));
       } if (err == 404) {
-        ircDebug(F(" Cannot send to channel.\r\n"));
+        snprintf_P(error_string, sizeof(error_string), PSTR("Cannot send to channel."));
       } else if (err == 422) {
-        ircDebug(F(" No MOTD\r\n"));
+        snprintf_P(error_string, sizeof(error_string), PSTR("No MOTD"));
       } else if (err >= 431 && err <= 436) {
-        ircDebug(F(" Nick error.\r\n"));
-        _irc_last_connect_attempt = millis() - IRC_RECONNECT_INTERVAL + NICK_RETRY;
+        snprintf_P(error_string, sizeof(error_string), PSTR("Nick error."));
+      } else {
+        snprintf_P(error_string, sizeof(error_string), PSTR("Unknown error, continuing..."));
+      }
+	  char buf[100];
+	  snprintf_P(buf, sizeof(buf), PSTR("Message is an error (%i): %s"), err, error_string);
+      ircDebug(buf);
+	  if (err >= 431 && err <= 436) {  //disconnect on nick error
+		_irc_last_connect_attempt = millis() - IRC_RECONNECT_INTERVAL + NICK_RETRY;
         ethClient_irc.stop();
         snprintf_P(buf, sizeof(buf), PSTR("Connection closed."));
         ircDebug(buf);
         return;
-      } else {
-        ircDebug(F(" Unknown error, continuing...\r\n"));
-      }
+	  }
     }
     return;
-  }    
+  }
   //respond to server PING
   pch = strstr_P(_irc_input_buffer,"PING :");
   if (pch == &_irc_input_buffer[0]) {
@@ -576,6 +595,10 @@ void unAway() {
     _irc_last_line_from_server = millis();
     _irc_away_status = false;
   }
+}
+
+boolean ircConnected() {
+  return(ircConnected(false));
 }
 
 boolean ircConnected(boolean in_progress) {
@@ -736,4 +759,16 @@ void ircDebug(const char *line) {
   } else {
     //do nothing
   }
+}
+
+void stringRemoveNonAlphaNum(char *str) {
+    unsigned long i = 0;
+    unsigned long j = 0;
+    char c;
+    while ((c = str[i++]) != '\0') {
+        if (isalnum(c)) {
+            str[j++] = c;
+        }
+    }
+    str[j] = '\0';
 }
