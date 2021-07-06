@@ -2,7 +2,13 @@
 #define IRC_CLIENT_H
 #include <Arduino.h>
 
+void ircSetClient(Client &client);
+
 void ircServer(const char * server, int port);
+
+boolean ircConnect(const char * server, int port);
+
+boolean ircConnect(Client &client, const char * server, int port, boolean reconnect);
 
 boolean ircConnect(const char * server, int port, boolean reconnect);
 
@@ -88,6 +94,6 @@ void ircDebug (const char *line);
 
 void ircSetDebug(void (*fp)(const char *));
 
-void stringRemoveNonAlphaNum(char *str);
+void stringRemoveNonPermitted(char *str);
 
 #endif

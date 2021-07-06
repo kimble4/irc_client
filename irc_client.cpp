@@ -1,7 +1,8 @@
 #include "irc_client.h"
-#include <ETH.h>
+//#include <ETH.h>
+#include <Client.h>
 
-#define DEBUG_IRC
+//#define DEBUG_IRC
 //#define DEBUG_IRC_VERBOSE
 #define IRC_BUFSIZE 200  //bytes (default 200)
 #define IRC_RECONNECT_INTERVAL 60000  //milliseconds
@@ -9,7 +10,7 @@
 #define NICK_RETRY 20000
 #define NICKSERV_TIMEOUT 10000  //milliseconds
 
-WiFiClient ethClient_irc;
+Client * _irc_ethClient = nullptr;
 unsigned long _irc_last_connect_attempt = 0;
 unsigned long _irc_last_line_from_server = 0;
 #define WAITING_FOR_NICKSERV 0
@@ -29,6 +30,13 @@ char _version[32] = "irc client";
 char _irc_server[32] = "";
 int _irc_server_port = 6667;
 
+void ircSetClient(Client &client) {
+  _irc_ethClient = &client;
+  #ifdef DEBUG_IRC_VERBOSE
+  ircDebug(F("Network Client set."));
+  #endif
+}
+
 void ircServer(const char * server, int port) {  //set server for implicit auto-reconnect
   char buf[100];
   snprintf_P(buf, sizeof(buf), PSTR("Server set to %s:%u"), server, port);
@@ -36,7 +44,16 @@ void ircServer(const char * server, int port) {  //set server for implicit auto-
   snprintf(_irc_server, sizeof(_irc_server), "%s", server);
   _irc_server_port = port;
 }
-  
+
+boolean ircConnect(const char * server, int port) {
+  return(ircConnect(server, port, false));
+}
+
+boolean ircConnect(Client &client, const char * server, int port, boolean reconnect) {
+  _irc_ethClient = &client;
+  return(ircConnect(server, port, reconnect));
+}
+
 boolean ircConnect(const char * server, int port, boolean reconnect) {
   if (reconnect) {
     snprintf(_irc_server, sizeof(_irc_server), "%s", server);
@@ -44,7 +61,11 @@ boolean ircConnect(const char * server, int port, boolean reconnect) {
   } else {
     snprintf(_irc_server, sizeof(_irc_server), "");  //empty string means we don't attempt to reconnect
   }
-  if (!ethClient_irc.connected()) {
+  if (_irc_ethClient == NULL) {
+    ircDebug(F("Client is not defined!"));
+    return(false);
+  }
+  if (!_irc_ethClient->connected()) {
     char buf[100];
     snprintf_P(buf, sizeof(buf), PSTR("Connecting to %s:%u"), server, port);
     ircDebug(buf);
@@ -55,21 +76,21 @@ boolean ircConnect(const char * server, int port, boolean reconnect) {
     _irc_identified = WAITING_FOR_NICKSERV;
     memset(_irc_input_buffer, 0, sizeof(_irc_input_buffer));
     _irc_input_buffer_pointer = 0;
-    if (ethClient_irc.connect(server, port)) {
+    if (_irc_ethClient->connect(server, port)) {
       _irc_last_line_from_server = millis();
       ircNetworkLight();
       snprintf_P(buf, sizeof(buf), PSTR("Connected to %s:%u"), server, port);
       ircDebug(buf);
-      ethClient_irc.print(F("USER "));
+      _irc_ethClient->print(F("USER "));
 	  //remove illegal characters from username
 	  snprintf(buf, sizeof(buf), "%s", _irc_nick);
-	  stringRemoveNonAlphaNum(buf);
-      ethClient_irc.print(buf);
-      ethClient_irc.print(F(" 8 * :"));
-      ethClient_irc.print(_version);
-      ethClient_irc.print(F("\r\nNICK "));
-      ethClient_irc.print(_irc_nick);
-      ethClient_irc.print(F("\r\n"));
+	  stringRemoveNonPermitted(buf);
+      _irc_ethClient->print(buf);
+      _irc_ethClient->print(F(" 8 * :"));
+      _irc_ethClient->print(_version);
+      _irc_ethClient->print(F("\r\nNICK "));
+      _irc_ethClient->print(_irc_nick);
+      _irc_ethClient->print(F("\r\n"));
       return(true);
     } else {
       snprintf_P(buf, sizeof(buf), PSTR("Connection failed!"));
@@ -104,7 +125,10 @@ void ircSetNickServPassword(const char * password) {
 }
 
 void doIRC() {
-  if (!ethClient_irc.connected() && strlen(_irc_server) > 0 && (!_irc_last_connect_attempt || millis() - _irc_last_connect_attempt >= IRC_RECONNECT_INTERVAL)) {  //(re)connect to irc server
+  if (_irc_ethClient == NULL) {
+    return;
+  }
+  if (!_irc_ethClient->connected() && strlen(_irc_server) > 0 && (!_irc_last_connect_attempt || millis() - _irc_last_connect_attempt >= IRC_RECONNECT_INTERVAL)) {  //(re)connect to irc server
     char buf[100];
     snprintf_P(buf, sizeof(buf), PSTR("Reconnecting to %s:%u..."), _irc_server, _irc_server_port);
     ircDebug(buf);
@@ -115,28 +139,28 @@ void doIRC() {
     _irc_identified = WAITING_FOR_NICKSERV;
     memset(_irc_input_buffer, 0, sizeof(_irc_input_buffer));
     _irc_input_buffer_pointer = 0;
-    if (ethClient_irc.connect(_irc_server, _irc_server_port)) {
+    if (_irc_ethClient->connect(_irc_server, _irc_server_port)) {
       _irc_last_line_from_server = millis();
       ircNetworkLight();
       snprintf_P(buf, sizeof(buf), PSTR("Connected to %s:%u"), _irc_server, _irc_server_port);
       ircDebug(buf);
-      ethClient_irc.print(F("USER "));
+      _irc_ethClient->print(F("USER "));
 	  //remove illegal characters from username
       snprintf(buf, sizeof(buf), "%s", _irc_nick);
-      stringRemoveNonAlphaNum(buf);
-      ethClient_irc.print(buf);
-      ethClient_irc.print(F(" 8 * :"));
-      ethClient_irc.print(_version);
-      ethClient_irc.print(F("\r\nNICK "));
-      ethClient_irc.print(_irc_nick);
-      ethClient_irc.print(F("\r\n"));
+      stringRemoveNonPermitted(buf);
+      _irc_ethClient->print(buf);
+      _irc_ethClient->print(F(" 8 * :"));
+      _irc_ethClient->print(_version);
+      _irc_ethClient->print(F("\r\nNICK "));
+      _irc_ethClient->print(_irc_nick);
+      _irc_ethClient->print(F("\r\n"));
     } else {
       snprintf_P(buf, sizeof(buf), PSTR("Connection failed!"));
       ircDebug(buf);
       ircOnDisconnect();
     }
   }
-  if (ethClient_irc.connected()) {
+  if (_irc_ethClient->connected()) {
     if (strlen(_nickserv_password) > 0 && _irc_identified == NOT_IDENTIFIED && _irc_pinged) {  // we've pinged and nickserv wants auth, now identify with nickserv
       ircNetworkLight();
 	  #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
@@ -160,11 +184,11 @@ void doIRC() {
       _irc_performed_on_connect = true;
       ircOnConnect();
     }
-    while (ethClient_irc.available()) {
+    while (_irc_ethClient->available()) {
       if (_irc_input_buffer_pointer == 0) {
         _line_start_time = millis();  //reset this on first char of line
       }
-      char c = ethClient_irc.read();
+      char c = _irc_ethClient->read();
       if (_irc_input_buffer_pointer < sizeof(_irc_input_buffer)) {
         _irc_input_buffer[_irc_input_buffer_pointer] = c;
         _irc_input_buffer_pointer++;
@@ -195,7 +219,7 @@ void doIRC() {
     }
     if (millis() - _irc_last_line_from_server >= IRC_TIMEOUT) {
       ircDebug(F("Connection appears comotose, closing!"));
-      ethClient_irc.stop();
+      _irc_ethClient->stop();
       _irc_pinged = false;
       _irc_performed_on_connect = false;
       ircOnDisconnect();
@@ -366,7 +390,7 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
         } else {
           ircOnChannelNotice(from, to, message);
         }
-        
+
       }
     } else if (strcmp(type, "JOIN") == 0) {  //we have a JOIN
       #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
@@ -381,7 +405,7 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
       ircNetworkLight();
       char buf[100];
       snprintf_P(buf, sizeof(buf), PSTR("%s set mode: %s on %s"), from, message, to);
-      ircDebug(buf);   
+      ircDebug(buf);
       #endif
       char test_string[20];
       strcpy(test_string, "+v ");
@@ -450,7 +474,7 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
       ircDebug(buf);
 	  if (err >= 431 && err <= 436) {  //disconnect on nick error
 		_irc_last_connect_attempt = millis() - IRC_RECONNECT_INTERVAL + NICK_RETRY;
-        ethClient_irc.stop();
+        _irc_ethClient->stop();
         snprintf_P(buf, sizeof(buf), PSTR("Connection closed."));
         ircDebug(buf);
         return;
@@ -470,9 +494,9 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
     snprintf_P(buf, sizeof(buf), PSTR("Got ping: %s, sending pong"), ping_string);
     ircDebug(buf);
     #endif
-    ethClient_irc.print("PONG ");
-    ethClient_irc.print(ping_string);
-    ethClient_irc.print("\r\n");
+    _irc_ethClient->print("PONG ");
+    _irc_ethClient->print(ping_string);
+    _irc_ethClient->print("\r\n");
     _irc_pinged = true;
     return;
   }
@@ -484,7 +508,7 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
     snprintf_P(buf, sizeof(buf), PSTR("Got ERROR from server: %s"), pch+7);
     ircDebug(buf);
     _irc_last_connect_attempt = millis();  //prevent immediate reconnect for rate limiting
-    ethClient_irc.stop();
+    _irc_ethClient->stop();
     snprintf_P(buf, sizeof(buf), PSTR("Connection closed."));
     ircDebug(buf);
     return;
@@ -496,102 +520,102 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
 }
 
 void joinIRCChannel(const __FlashStringHelper *channel) {
-  if (ethClient_irc.connected() && _irc_pinged) {
-    ethClient_irc.print(F("JOIN "));
-    ethClient_irc.print(FPSTR((PGM_P)channel));
-    ethClient_irc.print(F("\r\n"));
+  if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+    _irc_ethClient->print(F("JOIN "));
+    _irc_ethClient->print(FPSTR((PGM_P)channel));
+    _irc_ethClient->print(F("\r\n"));
     _irc_last_line_from_server = millis();
   }
 }
 
 void joinIRCChannel(const char *channel) {
-  if (ethClient_irc.connected() && _irc_pinged) {
-    ethClient_irc.print(F("JOIN "));
-    ethClient_irc.print(channel);
-    ethClient_irc.print(F("\r\n"));
+  if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+    _irc_ethClient->print(F("JOIN "));
+    _irc_ethClient->print(channel);
+    _irc_ethClient->print(F("\r\n"));
     _irc_last_line_from_server = millis();
   }
 }
 
 void sendIRCMessage(const __FlashStringHelper *target, const __FlashStringHelper *message) {
-  if (ethClient_irc.connected() && _irc_pinged) {
-    ethClient_irc.print(F("PRIVMSG "));
-    ethClient_irc.print(FPSTR((PGM_P)target));
-    ethClient_irc.print(F(" :"));
-    ethClient_irc.print(FPSTR((PGM_P)message));
-    ethClient_irc.print(F("\r\n"));
+  if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+    _irc_ethClient->print(F("PRIVMSG "));
+    _irc_ethClient->print(FPSTR((PGM_P)target));
+    _irc_ethClient->print(F(" :"));
+    _irc_ethClient->print(FPSTR((PGM_P)message));
+    _irc_ethClient->print(F("\r\n"));
     _irc_last_line_from_server = millis();
   }
 }
 
 void sendIRCMessage(const char *target, const __FlashStringHelper *message) {
-  if (ethClient_irc.connected() && _irc_pinged) {
-    ethClient_irc.print(F("PRIVMSG "));
-    ethClient_irc.print(target);
-    ethClient_irc.print(F(" :"));
-    ethClient_irc.print(FPSTR((PGM_P)message));
-    ethClient_irc.print(F("\r\n"));
+  if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+    _irc_ethClient->print(F("PRIVMSG "));
+    _irc_ethClient->print(target);
+    _irc_ethClient->print(F(" :"));
+    _irc_ethClient->print(FPSTR((PGM_P)message));
+    _irc_ethClient->print(F("\r\n"));
     _irc_last_line_from_server = millis();
   }
 }
 
 void sendIRCMessage(const char *target, const char *message) {
-  if (ethClient_irc.connected() && _irc_pinged) {
-    ethClient_irc.print(F("PRIVMSG "));
-    ethClient_irc.print(target);
-    ethClient_irc.print(F(" :"));
-    ethClient_irc.print(message);
-    ethClient_irc.print(F("\r\n"));
+  if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+    _irc_ethClient->print(F("PRIVMSG "));
+    _irc_ethClient->print(target);
+    _irc_ethClient->print(F(" :"));
+    _irc_ethClient->print(message);
+    _irc_ethClient->print(F("\r\n"));
     _irc_last_line_from_server = millis();
   }
 }
 
 void sendIRCNotice(const __FlashStringHelper *target, const __FlashStringHelper *message) {
-  if (ethClient_irc.connected() && _irc_pinged) {
-    ethClient_irc.print(F("NOTICE "));
-    ethClient_irc.print(FPSTR((PGM_P)target));
-    ethClient_irc.print(F(" :"));
-    ethClient_irc.print(FPSTR((PGM_P)message));
-    ethClient_irc.print(F("\r\n"));
+  if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+    _irc_ethClient->print(F("NOTICE "));
+    _irc_ethClient->print(FPSTR((PGM_P)target));
+    _irc_ethClient->print(F(" :"));
+    _irc_ethClient->print(FPSTR((PGM_P)message));
+    _irc_ethClient->print(F("\r\n"));
     _irc_last_line_from_server = millis();
   }
 }
 
 void sendIRCNotice(const char *target, const __FlashStringHelper *message) {
-  if (ethClient_irc.connected() && _irc_pinged) {
-    ethClient_irc.print(F("NOTICE "));
-    ethClient_irc.print(target);
-    ethClient_irc.print(F(" :"));
-    ethClient_irc.print(FPSTR((PGM_P)message));
-    ethClient_irc.print(F("\r\n"));
+  if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+    _irc_ethClient->print(F("NOTICE "));
+    _irc_ethClient->print(target);
+    _irc_ethClient->print(F(" :"));
+    _irc_ethClient->print(FPSTR((PGM_P)message));
+    _irc_ethClient->print(F("\r\n"));
     _irc_last_line_from_server = millis();
   }
 }
 
 void sendIRCNotice(const char *target, const char *message) {
-  if (ethClient_irc.connected() && _irc_pinged) {
-    ethClient_irc.print(F("NOTICE "));
-    ethClient_irc.print(target);
-    ethClient_irc.print(F(" :"));
-    ethClient_irc.print(message);
-    ethClient_irc.print(F("\r\n"));
+  if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+    _irc_ethClient->print(F("NOTICE "));
+    _irc_ethClient->print(target);
+    _irc_ethClient->print(F(" :"));
+    _irc_ethClient->print(message);
+    _irc_ethClient->print(F("\r\n"));
     _irc_last_line_from_server = millis();
   }
 }
 
 void setAway() {
-  if (!_irc_away_status && ethClient_irc.connected() && _irc_pinged) {
+  if (!_irc_away_status && _irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
     ircNetworkLight();
-    ethClient_irc.println(F("AWAY :Idle"));
+    _irc_ethClient->println(F("AWAY :Idle"));
     _irc_last_line_from_server = millis();
     _irc_away_status = true;
   }
 }
 
 void unAway() {
-  if (_irc_away_status && ethClient_irc.connected() && _irc_pinged) {
+  if (_irc_away_status && _irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
     ircNetworkLight();
-    ethClient_irc.println(F("AWAY"));
+    _irc_ethClient->println(F("AWAY"));
     _irc_last_line_from_server = millis();
     _irc_away_status = false;
   }
@@ -602,15 +626,20 @@ boolean ircConnected() {
 }
 
 boolean ircConnected(boolean in_progress) {
+  if (_irc_ethClient == NULL) {
+	return(false);
+  }
   if (!in_progress) {
-    return(ethClient_irc.connected() && _irc_pinged && _irc_performed_on_connect);
+    return(_irc_ethClient->connected() && _irc_pinged && _irc_performed_on_connect);
   } else {
-    return(ethClient_irc.connected());
+    return(_irc_ethClient->connected());
   }
 }
 
 void ircDisconnect() {
-  ethClient_irc.stop();
+  if (_irc_ethClient != NULL) {
+    _irc_ethClient->stop();
+  }
   snprintf(_irc_server, sizeof(_irc_server), "");  //empty string means we don't attempt to reconnect
 }
 
@@ -732,7 +761,7 @@ void ircOnOp(const char * from, const char * channel) {
 
 void (*fpNetworkLightOn)();
 void ircSetNetworkLightOn(void (*fp)(void)) {
-  fpNetworkLightOn = fp; 
+  fpNetworkLightOn = fp;
 }
 void ircNetworkLight(){
   if( 0 != fpNetworkLightOn ) {
@@ -750,7 +779,7 @@ void ircDebug (const __FlashStringHelper *line) {
 
 void (*fpDebug)(const char *);
 void ircSetDebug(void (*fp)(const char *)) {
-  fpDebug = fp; 
+  fpDebug = fp;
 }
 
 void ircDebug(const char *line) {
@@ -761,12 +790,12 @@ void ircDebug(const char *line) {
   }
 }
 
-void stringRemoveNonAlphaNum(char *str) {
+void stringRemoveNonPermitted(char *str) {
     unsigned long i = 0;
     unsigned long j = 0;
     char c;
     while ((c = str[i++]) != '\0') {
-        if (isalnum(c)) {
+        if (isalnum(c) || c == '-' || c == '.' | c == '_') {
             str[j++] = c;
         }
     }
