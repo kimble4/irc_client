@@ -1,5 +1,4 @@
 #include "irc_client.h"
-//#include <ETH.h>
 #include <Client.h>
 
 //#define DEBUG_IRC
@@ -24,11 +23,12 @@ boolean _irc_away_status = false;
 char _irc_input_buffer[IRC_BUFSIZE];
 int _irc_input_buffer_pointer = 0;
 unsigned long _line_start_time = 0;
-char _nickserv_password[20] = "";
-char _irc_nick[20] = "irc_client";
-char _version[32] = "irc client";
-char _irc_server[32] = "";
+const char * _nickserv_password = "";
+const char * _irc_nick = "irc_client";
+const char * _version = "";
+const char * _irc_server = "";
 int _irc_server_port = 6667;
+
 
 void ircSetClient(Client &client) {
   _irc_ethClient = &client;
@@ -40,8 +40,9 @@ void ircSetClient(Client &client) {
 void ircServer(const char * server, int port) {  //set server for implicit auto-reconnect
   char buf[100];
   snprintf_P(buf, sizeof(buf), PSTR("Server set to %s:%u"), server, port);
+  _irc_server = server;
   ircDebug(buf);
-  snprintf(_irc_server, sizeof(_irc_server), "%s", server);
+  _irc_server = server; 
   _irc_server_port = port;
 }
 
@@ -56,10 +57,10 @@ boolean ircConnect(Client &client, const char * server, int port, boolean reconn
 
 boolean ircConnect(const char * server, int port, boolean reconnect) {
   if (reconnect) {
-    snprintf(_irc_server, sizeof(_irc_server), "%s", server);
-    _irc_server_port = port;
+    _irc_server = server;
+	_irc_server_port = port;
   } else {
-    snprintf(_irc_server, sizeof(_irc_server), "");  //empty string means we don't attempt to reconnect
+    _irc_server = "";
   }
   if (_irc_ethClient == NULL) {
     ircDebug(F("Client is not defined!"));
@@ -104,21 +105,21 @@ boolean ircConnect(const char * server, int port, boolean reconnect) {
 }
 
 void ircSetNick(const char * name) {  //fixme should this do a NICK after we're connected?
-  snprintf(_irc_nick, sizeof(_irc_nick), "%s", name);
+  _irc_nick = name;
   char buf[100];
   snprintf_P(buf, sizeof(buf), PSTR("Set nick to %s"), _irc_nick);
   ircDebug(buf);
 }
 
-void ircSetVersion(const char * version) {  //fixme should this do a NICK after we're connected?
-  snprintf(_version, sizeof(_version), "%s", version);
+void ircSetVersion(const char * version) {
+  _version = version;
   char buf[100];
   snprintf_P(buf, sizeof(buf), PSTR("Set version to: %s"), _version);
   ircDebug(buf);
 }
 
 void ircSetNickServPassword(const char * password) {
-  snprintf(_nickserv_password, sizeof(_nickserv_password), "%s", password);
+  _nickserv_password = password;
   char buf[100];
   snprintf_P(buf, sizeof(buf), PSTR("Setting nickserv password to \"%s\""), _nickserv_password);
   ircDebug(buf);
@@ -640,7 +641,7 @@ void ircDisconnect() {
   if (_irc_ethClient != NULL) {
     _irc_ethClient->stop();
   }
-  snprintf(_irc_server, sizeof(_irc_server), "");  //empty string means we don't attempt to reconnect
+  _irc_server = "";
 }
 
 void (*fpOnConnect)();

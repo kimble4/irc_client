@@ -1,6 +1,7 @@
 #ifndef IRC_CLIENT_H
 #define IRC_CLIENT_H
 #include <Arduino.h>
+#include <Client.h>
 
 void ircSetClient(Client &client);
 
