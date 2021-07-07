@@ -39,6 +39,18 @@ void sendIRCNotice(const char *target, const __FlashStringHelper *message);
 
 void sendIRCNotice(const char *target, const char *message);
 
+void sendIRCCTCP(const __FlashStringHelper *target, const __FlashStringHelper *message);
+
+void sendIRCCTCP(const char *target, const __FlashStringHelper *message);
+
+void sendIRCCTCP(const char *target, const char *message);
+
+void sendIRCAction(const __FlashStringHelper *target, const __FlashStringHelper *message);
+
+void sendIRCAction(const char *target, const __FlashStringHelper *message);
+
+void sendIRCAction(const char *target, const char *message);
+
 void setAway();
 
 void unAway();
@@ -60,6 +72,8 @@ void ircOnDisconnect();
 void ircSetOnPrivateMessage(void (*fp)(const char *, const char*));
 
 void ircOnPrivateMessage(const char * from, const char * message);
+
+void ircSetOnAction(void (*fp)(const char *, const char *, const char *));
 
 void ircSetOnCTCP(void (*fp)(const char *, const char *, const char *));
 

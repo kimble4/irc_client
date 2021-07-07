@@ -42,7 +42,7 @@ void ircServer(const char * server, int port) {  //set server for implicit auto-
   snprintf_P(buf, sizeof(buf), PSTR("Server set to %s:%u"), server, port);
   _irc_server = server;
   ircDebug(buf);
-  _irc_server = server; 
+  _irc_server = server;
   _irc_server_port = port;
 }
 
@@ -109,6 +109,11 @@ void ircSetNick(const char * name) {  //fixme should this do a NICK after we're 
   char buf[100];
   snprintf_P(buf, sizeof(buf), PSTR("Set nick to %s"), _irc_nick);
   ircDebug(buf);
+  if (_irc_ethClient->connected() && _irc_pinged) {
+    _irc_ethClient->print(F("NICK "));
+    _irc_ethClient->print(_irc_nick);
+    _irc_ethClient->print(F("\r\n"));
+  }
 }
 
 void ircSetVersion(const char * version) {
@@ -292,14 +297,10 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
       if (strcmp(to, _irc_nick) == 0) { //this is a private /MSG
         ircNetworkLight();
         if (message[0] == '\1') {  //is CTCP
-          memmove(message, message+1, strlen(message));  //move the string 1 character to the left, overwriting first delimiter
-          length = strcspn(message, "\1");
+          //memmove(message, message+1, strlen(message));  //move the string 1 character to the left, overwriting first delimiter
+          message++;
+		  length = strcspn(message, "\1");
           message[length] = '\0'; //terminate at '\1', if present.
-          #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
-          char buf[100];
-          snprintf_P(buf, sizeof(buf), PSTR("<%s> CTCP: %s"), from, message);
-          ircDebug(buf);
-          #endif
           ircOnCTCP(from, to, message);
         } else {  //normal private /MSG
           #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
@@ -311,15 +312,10 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
         }
       } else {  //channel message
         if (message[0] == '\1') {  //is CTCP
-          memmove(message, message+1, strlen(message));  //move the string 1 character to the left, overwriting first delimiter
-          length = strcspn(message, "\1");  //terminate at '\1', if present.
+          //memmove(message, message+1, strlen(message));  //move the string 1 character to the left, overwriting first delimiter
+          message++;
+		  length = strcspn(message, "\1");  //terminate at '\1', if present.
           message[length] = '\0';
-          #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
-          ircNetworkLight();
-          char buf[100];
-          snprintf_P(buf, sizeof(buf), PSTR("%s <%s> CTCP: %s"), to, from, message);
-          ircDebug(buf);
-          #endif
           ircOnCTCP(from, to, message);
         } else {  //normal message
           #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
@@ -604,6 +600,73 @@ void sendIRCNotice(const char *target, const char *message) {
   }
 }
 
+void sendIRCCTCP(const __FlashStringHelper *target, const __FlashStringHelper *message) {
+  if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+    _irc_ethClient->print(F("PRIVMSG "));
+    _irc_ethClient->print(FPSTR((PGM_P)target));
+    _irc_ethClient->print(F(" :\x01"));
+    _irc_ethClient->print(FPSTR((PGM_P)message));
+    _irc_ethClient->print(F("\x01\r\n"));
+    _irc_last_line_from_server = millis();
+  }
+}
+
+void sendIRCCTCP(const char *target, const __FlashStringHelper *message) {
+  if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+    _irc_ethClient->print(F("PRIVMSG "));
+    _irc_ethClient->print(target);
+    _irc_ethClient->print(F(" :\x01"));
+    _irc_ethClient->print(FPSTR((PGM_P)message));
+    _irc_ethClient->print(F("\x01\r\n"));
+    _irc_last_line_from_server = millis();
+  }
+}
+
+void sendIRCCTCP(const char *target, const char *message) {
+  if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+	_irc_ethClient->print(F("PRIVMSG "));
+    _irc_ethClient->print(target);
+    _irc_ethClient->print(F(" :\x01"));
+    _irc_ethClient->print(message);
+    _irc_ethClient->print(F("\x01\r\n"));
+    _irc_last_line_from_server = millis();
+  }
+}
+
+void sendIRCAction(const __FlashStringHelper *target, const __FlashStringHelper *message) {
+  if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+    _irc_ethClient->print(F("PRIVMSG "));
+    _irc_ethClient->print(FPSTR((PGM_P)target));
+    _irc_ethClient->print(F(" :\x01" "ACTION "));
+    _irc_ethClient->print(FPSTR((PGM_P)message));
+    _irc_ethClient->print(F("\x01\r\n"));
+    _irc_last_line_from_server = millis();
+  }
+}
+
+void sendIRCAction(const char *target, const __FlashStringHelper *message) {
+  if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+    _irc_ethClient->print(F("PRIVMSG "));
+    _irc_ethClient->print(target);
+    _irc_ethClient->print(F(" :\x01" "ACTION "));
+    _irc_ethClient->print(FPSTR((PGM_P)message));
+    _irc_ethClient->print(F("\x01\r\n"));
+    _irc_last_line_from_server = millis();
+  }
+}
+
+void sendIRCAction(const char *target, const char *message) {
+  if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+    _irc_ethClient->print(F("PRIVMSG "));
+    _irc_ethClient->print(target);
+    _irc_ethClient->print(F(" :\x01" "ACTION "));
+    _irc_ethClient->print(message);
+    _irc_ethClient->print(F("\x01\r\n"));
+    _irc_last_line_from_server = millis();
+  }
+}
+
+
 void setAway() {
   if (!_irc_away_status && _irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
     ircNetworkLight();
@@ -664,7 +727,7 @@ void ircOnDisconnect() {
   if( 0 != fpOnDisconnect ) {
     (*fpOnDisconnect)();
   } else {
-    //do nothing
+	//do noting
   }
 }
 
@@ -676,7 +739,11 @@ void ircOnPrivateMessage(const char * from, const char * message) {
   if( 0 != fpOnPrivateMessage ) {
     (*fpOnPrivateMessage)(from, message);
   } else {
-    //do nothing
+    #ifdef DEBUG_IRC_VERBOSE
+    char buf[100];
+    snprintf_P(buf, sizeof(buf), PSTR("No callback set for private message!"), from);
+    ircDebug(buf);
+    #endif
   }
 }
 
@@ -688,7 +755,11 @@ void ircOnChannelMessage(const char * from, const char * channel, const char * m
   if( 0 != fpOnChannelMessage ) {
     (*fpOnChannelMessage)(from, channel, message);
   } else {
-    //do nothing
+    #ifdef DEBUG_IRC_VERBOSE
+    char buf[100];
+    snprintf_P(buf, sizeof(buf), PSTR("No callback set for channel message!"), from);
+    ircDebug(buf);
+    #endif
   }
 }
 
@@ -700,7 +771,11 @@ void ircOnPrivateNotice(const char * from, const char * message) {
   if( 0 != fpOnPrivateNotice ) {
     (*fpOnPrivateNotice)(from, message);
   } else {
-    //do nothing
+    #ifdef DEBUG_IRC_VERBOSE
+	char buf[100];
+    snprintf_P(buf, sizeof(buf), PSTR("No callback set for private NOTICE!"), from);
+    ircDebug(buf);
+    #endif
   }
 }
 
@@ -712,8 +787,17 @@ void ircOnChannelNotice(const char * from, const char * channel, const char * me
   if( 0 != fpOnChannelNotice ) {
     (*fpOnChannelNotice)(from, channel, message);
   } else {
-    //do nothing
+    #ifdef DEBUG_IRC_VERBOSE
+	char buf[100];
+    snprintf_P(buf, sizeof(buf), PSTR("No callback set for channel NOTICE!"), from);
+    ircDebug(buf);
+    #endif
   }
+}
+
+void (*fpOnAction)(const char *, const char *, const char *);
+void ircSetOnAction(void (*fp)(const char *, const char *, const char *)) {
+  fpOnAction = fp;
 }
 
 void (*fpOnCTCP)(const char *, const char *, const char *);
@@ -722,17 +806,90 @@ void ircSetOnCTCP(void (*fp)(const char *, const char *, const char *)) {
 }
 void ircOnCTCP(const char * from, const char * to, const char * message) {
   char * pch;
+  pch = strstr_P(message,"ACTION");
+  if (pch == &message[0]) {  //respond to CTCP ACTION
+	ircNetworkLight();
+    char buf[100];
+    #ifdef DEBUG_IRC
+    snprintf_P(buf, sizeof(buf), PSTR("* %s %s"), from, message+7);
+    ircDebug(buf);
+    #endif
+    if( 0 != fpOnAction ) {
+      (*fpOnAction)(from, to, message+7);
+  	} else {
+      #ifdef DEBUG_IRC_VERBOSE
+      snprintf_P(buf, sizeof(buf), PSTR("No callback set for CTCP ACTION!"), from);
+      ircDebug(buf);
+	  #endif
+  	}
+    return;
+  }
   pch = strstr_P(message,"VERSION");
   if (pch == &message[0]) {  //respond to CTCP VERSION request
-    char buf[100];
+	ircNetworkLight();
+	char buf[100];
+    #ifdef DEBUG_IRC
     snprintf_P(buf, sizeof(buf), PSTR("Got CTCP VERSION request from <%s>"), from);
     ircDebug(buf);
+    #endif
+    snprintf_P(buf, sizeof(buf), PSTR("\x01VERSION %s\x01"), _version);
+    sendIRCNotice(from, buf);
+	return;
+  }
+  pch = strstr_P(message,"PING");
+  if (pch == &message[0]) {  //respond to CTCP PING request
     ircNetworkLight();
-    sendIRCNotice(from, _version);
-  } else if( 0 != fpOnCTCP ) {
+	char buf[100];
+    #ifdef DEBUG_IRC
+    snprintf_P(buf, sizeof(buf), PSTR("Got CTCP PING request from <%s>"), from);
+    ircDebug(buf);
+    #endif
+    snprintf_P(buf, sizeof(buf), PSTR("\x01%s\x01"), message);
+    sendIRCNotice(from, buf);
+	return;
+  }
+  pch = strstr_P(message,"CLIENTINFO");
+  if (pch == &message[0]) {  //respond to CTCP CLIENTINFO
+	ircNetworkLight();
+    char buf[100];
+    #ifdef DEBUG_IRC
+    snprintf_P(buf, sizeof(buf), PSTR("Got CTCP CLIENTINFO request from <%s>"), from);
+    ircDebug(buf);
+    #endif
+    snprintf_P(buf, sizeof(buf), PSTR("\x01CLIENTINFO ACTION CLIENTINFO PING TIME VERSION\x01"));
+    sendIRCNotice(from, buf);
+    return;
+  }
+  pch = strstr_P(message,"TIME");
+  if (pch == &message[0]) {  //respond to CTCP TIME
+	ircNetworkLight();
+    char buf[100];
+    #ifdef DEBUG_IRC
+    snprintf_P(buf, sizeof(buf), PSTR("Got CTCP TIME request from <%s>"), from);
+    ircDebug(buf);
+    #endif
+	#if defined (ESP32) || defined (ESP8266)
+	time_t now = time(nullptr);
+	struct tm * timeinfo;
+	timeinfo = localtime(&now);
+  	snprintf_P(buf, sizeof(buf), PSTR("\x01TIME %u-%02u-%02u %u:%02u:%02u"),
+   	  timeinfo->tm_year +1900, timeinfo->tm_mon +1, timeinfo->tm_mday,
+      timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+    #else
+	snprintf_P(buf, sizeof(buf), PSTR("\x01TIME %u\x01"), millis());
+    #endif
+	sendIRCNotice(from, buf);
+    return;
+  }
+  if (0 != fpOnCTCP ) {
+	ircNetworkLight();
     (*fpOnCTCP)(from, to, message);
   } else {
-    //do nothing
+    #ifdef DEBUG_IRC_VERBOSE
+    char buf[100];
+    snprintf_P(buf, sizeof(buf), PSTR("No callback set for CTCP!"), from);
+    ircDebug(buf);
+    #endif
   }
 }
 
