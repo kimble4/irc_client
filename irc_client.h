@@ -59,6 +59,10 @@ boolean ircConnected();
 
 boolean ircConnected(boolean in_progress);
 
+void ircMode(const __FlashStringHelper *command);
+
+void ircMode(const char *command);
+
 void ircDisconnect();
 
 void ircSetOnConnect(void (*fp)(void));

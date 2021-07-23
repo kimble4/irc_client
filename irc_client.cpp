@@ -110,6 +110,7 @@ void ircSetNick(const char * name) {  //fixme should this do a NICK after we're 
   snprintf_P(buf, sizeof(buf), PSTR("Set nick to %s"), _irc_nick);
   ircDebug(buf);
   if (_irc_ethClient->connected() && _irc_pinged) {
+	ircNetworkLight();
     _irc_ethClient->print(F("NICK "));
     _irc_ethClient->print(_irc_nick);
     _irc_ethClient->print(F("\r\n"));
@@ -518,6 +519,7 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
 
 void joinIRCChannel(const __FlashStringHelper *channel) {
   if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+	ircNetworkLight();
     _irc_ethClient->print(F("JOIN "));
     _irc_ethClient->print(FPSTR((PGM_P)channel));
     _irc_ethClient->print(F("\r\n"));
@@ -527,6 +529,7 @@ void joinIRCChannel(const __FlashStringHelper *channel) {
 
 void joinIRCChannel(const char *channel) {
   if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+	ircNetworkLight();
     _irc_ethClient->print(F("JOIN "));
     _irc_ethClient->print(channel);
     _irc_ethClient->print(F("\r\n"));
@@ -536,6 +539,7 @@ void joinIRCChannel(const char *channel) {
 
 void sendIRCMessage(const __FlashStringHelper *target, const __FlashStringHelper *message) {
   if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+	ircNetworkLight();
     _irc_ethClient->print(F("PRIVMSG "));
     _irc_ethClient->print(FPSTR((PGM_P)target));
     _irc_ethClient->print(F(" :"));
@@ -547,6 +551,7 @@ void sendIRCMessage(const __FlashStringHelper *target, const __FlashStringHelper
 
 void sendIRCMessage(const char *target, const __FlashStringHelper *message) {
   if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+	ircNetworkLight();
     _irc_ethClient->print(F("PRIVMSG "));
     _irc_ethClient->print(target);
     _irc_ethClient->print(F(" :"));
@@ -558,6 +563,7 @@ void sendIRCMessage(const char *target, const __FlashStringHelper *message) {
 
 void sendIRCMessage(const char *target, const char *message) {
   if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+	ircNetworkLight();
     _irc_ethClient->print(F("PRIVMSG "));
     _irc_ethClient->print(target);
     _irc_ethClient->print(F(" :"));
@@ -569,6 +575,7 @@ void sendIRCMessage(const char *target, const char *message) {
 
 void sendIRCNotice(const __FlashStringHelper *target, const __FlashStringHelper *message) {
   if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+	ircNetworkLight();
     _irc_ethClient->print(F("NOTICE "));
     _irc_ethClient->print(FPSTR((PGM_P)target));
     _irc_ethClient->print(F(" :"));
@@ -580,6 +587,7 @@ void sendIRCNotice(const __FlashStringHelper *target, const __FlashStringHelper 
 
 void sendIRCNotice(const char *target, const __FlashStringHelper *message) {
   if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+	ircNetworkLight();
     _irc_ethClient->print(F("NOTICE "));
     _irc_ethClient->print(target);
     _irc_ethClient->print(F(" :"));
@@ -591,6 +599,7 @@ void sendIRCNotice(const char *target, const __FlashStringHelper *message) {
 
 void sendIRCNotice(const char *target, const char *message) {
   if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+	ircNetworkLight();
     _irc_ethClient->print(F("NOTICE "));
     _irc_ethClient->print(target);
     _irc_ethClient->print(F(" :"));
@@ -602,6 +611,7 @@ void sendIRCNotice(const char *target, const char *message) {
 
 void sendIRCCTCP(const __FlashStringHelper *target, const __FlashStringHelper *message) {
   if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+	ircNetworkLight();
     _irc_ethClient->print(F("PRIVMSG "));
     _irc_ethClient->print(FPSTR((PGM_P)target));
     _irc_ethClient->print(F(" :\x01"));
@@ -613,6 +623,7 @@ void sendIRCCTCP(const __FlashStringHelper *target, const __FlashStringHelper *m
 
 void sendIRCCTCP(const char *target, const __FlashStringHelper *message) {
   if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+	ircNetworkLight();
     _irc_ethClient->print(F("PRIVMSG "));
     _irc_ethClient->print(target);
     _irc_ethClient->print(F(" :\x01"));
@@ -624,6 +635,7 @@ void sendIRCCTCP(const char *target, const __FlashStringHelper *message) {
 
 void sendIRCCTCP(const char *target, const char *message) {
   if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+	ircNetworkLight();
 	_irc_ethClient->print(F("PRIVMSG "));
     _irc_ethClient->print(target);
     _irc_ethClient->print(F(" :\x01"));
@@ -635,6 +647,7 @@ void sendIRCCTCP(const char *target, const char *message) {
 
 void sendIRCAction(const __FlashStringHelper *target, const __FlashStringHelper *message) {
   if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+	ircNetworkLight();
     _irc_ethClient->print(F("PRIVMSG "));
     _irc_ethClient->print(FPSTR((PGM_P)target));
     _irc_ethClient->print(F(" :\x01" "ACTION "));
@@ -646,6 +659,7 @@ void sendIRCAction(const __FlashStringHelper *target, const __FlashStringHelper 
 
 void sendIRCAction(const char *target, const __FlashStringHelper *message) {
   if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+	ircNetworkLight();
     _irc_ethClient->print(F("PRIVMSG "));
     _irc_ethClient->print(target);
     _irc_ethClient->print(F(" :\x01" "ACTION "));
@@ -657,6 +671,7 @@ void sendIRCAction(const char *target, const __FlashStringHelper *message) {
 
 void sendIRCAction(const char *target, const char *message) {
   if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+	ircNetworkLight();
     _irc_ethClient->print(F("PRIVMSG "));
     _irc_ethClient->print(target);
     _irc_ethClient->print(F(" :\x01" "ACTION "));
@@ -665,7 +680,6 @@ void sendIRCAction(const char *target, const char *message) {
     _irc_last_line_from_server = millis();
   }
 }
-
 
 void setAway() {
   if (!_irc_away_status && _irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
@@ -700,8 +714,29 @@ boolean ircConnected(boolean in_progress) {
   }
 }
 
+void ircMode(const __FlashStringHelper *command) {
+  if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+    ircNetworkLight();
+    _irc_ethClient->print(F("MODE "));
+    _irc_ethClient->print(FPSTR((PGM_P)command));
+    _irc_ethClient->print(F("\r\n"));
+    _irc_last_line_from_server = millis();
+  }
+}
+
+void ircMode(const char *command) {
+  if (_irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+    ircNetworkLight();
+    _irc_ethClient->print(F("MODE "));
+	_irc_ethClient->print(command);
+	_irc_ethClient->print(F("\r\n"));
+    _irc_last_line_from_server = millis();
+  }
+}
+
 void ircDisconnect() {
   if (_irc_ethClient != NULL) {
+	ircNetworkLight();
     _irc_ethClient->stop();
   }
   _irc_server = "";
