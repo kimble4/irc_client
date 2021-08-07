@@ -296,16 +296,15 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
     #endif
     if (strcmp(type, "PRIVMSG") == 0) {  //we have a PRIVMSG
       if (strcmp(to, _irc_nick) == 0) { //this is a private /MSG
-        ircNetworkLight();
         if (message[0] == '\1') {  //is CTCP
-          //memmove(message, message+1, strlen(message));  //move the string 1 character to the left, overwriting first delimiter
           message++;
 		  length = strcspn(message, "\1");
           message[length] = '\0'; //terminate at '\1', if present.
           ircOnCTCP(from, to, message);
         } else {  //normal private /MSG
           #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
-          char buf[100];
+          ircNetworkLight();;
+		  char buf[100];
           snprintf_P(buf, sizeof(buf), PSTR("MSG <%s> %s"), from, message);
           ircDebug(buf);
           #endif
@@ -313,7 +312,6 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
         }
       } else {  //channel message
         if (message[0] == '\1') {  //is CTCP
-          //memmove(message, message+1, strlen(message));  //move the string 1 character to the left, overwriting first delimiter
           message++;
 		  length = strcspn(message, "\1");  //terminate at '\1', if present.
           message[length] = '\0';
@@ -339,7 +337,7 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
         #endif
         if (strcmp(from, "NickServ") == 0) {  //notice from NickServ
           ircNetworkLight();
-          pch = strstr_P(message, "Password accepted");  //
+          pch = strstr_P(message, "Password accepted");
           if (pch != NULL) {
             _irc_identified = IDENTIFY_CONFIRMED;
             char buf[100];
@@ -347,7 +345,7 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
             ircDebug(buf);
             return;
           }
-          pch = strstr_P(message, "This nickname is registered and protected.");  //
+          pch = strstr_P(message, "This nickname is registered and protected.");
           if (pch != NULL) {
             _irc_identified = NOT_IDENTIFIED;
 			#ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
@@ -444,12 +442,14 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
       snprintf_P(buf, sizeof(buf), PSTR("RPL_UNAWAY: %s"), message);
       ircDebug(buf);
       #endif
+	  _irc_away_status = false;
     } else if (strcmp(type, "306") == 0 && strcmp(to, _irc_nick) == 0) {  //we are now AWAY
       #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
       char buf[100];
       snprintf_P(buf, sizeof(buf), PSTR("RPL_NOWAWAY: %s"), message);
       ircDebug(buf);
       #endif
+	  _irc_away_status = true;
     }
     //test for error codes
     int err = atoi(type);
@@ -686,7 +686,6 @@ void setAway() {
     ircNetworkLight();
     _irc_ethClient->println(F("AWAY :Idle"));
     _irc_last_line_from_server = millis();
-    _irc_away_status = true;
   }
 }
 
@@ -695,7 +694,6 @@ void unAway() {
     ircNetworkLight();
     _irc_ethClient->println(F("AWAY"));
     _irc_last_line_from_server = millis();
-    _irc_away_status = false;
   }
 }
 
@@ -744,11 +742,11 @@ void ircDisconnect() {
 
 void (*fpOnConnect)();
 void ircSetOnConnect(void (*fp)(void) ) {
-  fpOnConnect = fp; 
+  fpOnConnect = fp;
 }
 void ircOnConnect() {
   if( 0 != fpOnConnect ) {
-    (*fpOnConnect)();
+	(*fpOnConnect)();
   } else {
     //do nothing
   }
@@ -756,11 +754,11 @@ void ircOnConnect() {
 
 void (*fpOnDisconnect)();
 void ircSetOnDisconnect(void (*fp)(void) ) {
-  fpOnDisconnect = fp; 
+  fpOnDisconnect = fp;
 }
 void ircOnDisconnect() {
   if( 0 != fpOnDisconnect ) {
-    (*fpOnDisconnect)();
+	(*fpOnDisconnect)();
   } else {
 	//do noting
   }
