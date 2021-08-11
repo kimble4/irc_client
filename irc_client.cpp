@@ -298,13 +298,13 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
       if (strcmp(to, _irc_nick) == 0) { //this is a private /MSG
         if (message[0] == '\1') {  //is CTCP
           message++;
-		  length = strcspn(message, "\1");
-          message[length] = '\0'; //terminate at '\1', if present.
+		  length = strcspn(message, "\1");  //terminate at '\1', if present.
+          message[length] = '\0';
           ircOnCTCP(from, to, message);
         } else {  //normal private /MSG
           #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
-          ircNetworkLight();;
-		  char buf[100];
+          ircNetworkLight();
+          char buf[100];
           snprintf_P(buf, sizeof(buf), PSTR("MSG <%s> %s"), from, message);
           ircDebug(buf);
           #endif
