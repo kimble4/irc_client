@@ -53,6 +53,10 @@ void sendIRCAction(const char *target, const char *message);
 
 void setAway();
 
+void setAway(const char *message);
+
+void setAway(const __FlashStringHelper *message);
+
 void unAway();
 
 boolean ircConnected();

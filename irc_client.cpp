@@ -1,7 +1,7 @@
 #include "irc_client.h"
 #include <Client.h>
 
-//#define DEBUG_IRC
+#define DEBUG_IRC
 //#define DEBUG_IRC_VERBOSE
 #define IRC_BUFSIZE 200  //bytes (default 200)
 #define IRC_RECONNECT_INTERVAL 60000  //milliseconds
@@ -684,15 +684,48 @@ void sendIRCAction(const char *target, const char *message) {
 }
 
 void setAway() {
+  setAway(F("Idle"));
+}
+
+void setAway(const char *message) {
   if (!_irc_away_status && _irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
 	if ( millis() - _irc_last_away >= IRC_RATE_LIMIT) {
+	  #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+      char buf[100];
+      snprintf_P(buf, sizeof(buf), PSTR("Setting AWAY: %s"), message);
+      ircDebug(buf);
+      #endif
    	  ircNetworkLight();
-      _irc_ethClient->println(F("AWAY :Idle"));
+      _irc_ethClient->print(F("AWAY :"));
+	  _irc_ethClient->print(message);
+	  _irc_ethClient->print(F("\r\n"));
       _irc_last_line_from_server = millis();
 	 _irc_last_away = millis();
     } else {
       #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
-      ircDebug(F("Not setting away: Rate limited."));
+      ircDebug(F("Not setting AWAY: Rate limited."));
+      #endif
+    }
+  }
+}
+
+void setAway(const __FlashStringHelper *message) {
+  if (!_irc_away_status && _irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
+    if ( millis() - _irc_last_away >= IRC_RATE_LIMIT) {
+      #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+      char buf[100];
+      snprintf_P(buf, sizeof(buf), PSTR("Setting AWAY: %s"), FPSTR((PGM_P)message));
+      ircDebug(buf);
+      #endif
+      ircNetworkLight();
+      _irc_ethClient->print(F("AWAY :"));
+      _irc_ethClient->print(FPSTR((PGM_P)message));
+      _irc_ethClient->print(F("\r\n"));
+      _irc_last_line_from_server = millis();
+     _irc_last_away = millis();
+    } else {
+      #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+      ircDebug(F("Not setting AWAY: Rate limited."));
       #endif
     }
   }
@@ -701,13 +734,16 @@ void setAway() {
 void unAway() {
   if (_irc_away_status && _irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
 	if (millis() - _irc_last_away >= IRC_RATE_LIMIT) {
+	  #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+      ircDebug(F("Setting UNAWAY"));
+      #endif
       ircNetworkLight();
-      _irc_ethClient->println(F("AWAY"));
+      _irc_ethClient->print(F("AWAY\r\n"));
       _irc_last_line_from_server = millis();
 	  _irc_last_away = millis();
     } else {
       #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
-      ircDebug(F("Not setting unaway: Rate limited."));
+      ircDebug(F("Not setting UNAWAY: Rate limited."));
       #endif
     }
   }
