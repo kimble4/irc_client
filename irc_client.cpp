@@ -8,6 +8,7 @@
 #define IRC_TIMEOUT 120000  //milliseconds
 #define NICK_RETRY 20000
 #define NICKSERV_TIMEOUT 10000  //milliseconds
+#define IRC_RATE_LIMIT 1000  //milliseconds
 
 Client * _irc_ethClient = nullptr;
 unsigned long _irc_last_connect_attempt = 0;
@@ -20,6 +21,7 @@ int _irc_identified = WAITING_FOR_NICKSERV;
 boolean _irc_performed_on_connect = false;
 boolean _irc_pinged = false;
 boolean _irc_away_status = false;
+long _irc_last_away = 0;
 char _irc_input_buffer[IRC_BUFSIZE];
 int _irc_input_buffer_pointer = 0;
 unsigned long _line_start_time = 0;
@@ -683,17 +685,31 @@ void sendIRCAction(const char *target, const char *message) {
 
 void setAway() {
   if (!_irc_away_status && _irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
-    ircNetworkLight();
-    _irc_ethClient->println(F("AWAY :Idle"));
-    _irc_last_line_from_server = millis();
+	if ( millis() - _irc_last_away >= IRC_RATE_LIMIT) {
+   	  ircNetworkLight();
+      _irc_ethClient->println(F("AWAY :Idle"));
+      _irc_last_line_from_server = millis();
+	 _irc_last_away = millis();
+    } else {
+      #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+      ircDebug(F("Not setting away: Rate limited."));
+      #endif
+    }
   }
 }
 
 void unAway() {
   if (_irc_away_status && _irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
-    ircNetworkLight();
-    _irc_ethClient->println(F("AWAY"));
-    _irc_last_line_from_server = millis();
+	if (millis() - _irc_last_away >= IRC_RATE_LIMIT) {
+      ircNetworkLight();
+      _irc_ethClient->println(F("AWAY"));
+      _irc_last_line_from_server = millis();
+	  _irc_last_away = millis();
+    } else {
+      #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+      ircDebug(F("Not setting unaway: Rate limited."));
+      #endif
+    }
   }
 }
 
