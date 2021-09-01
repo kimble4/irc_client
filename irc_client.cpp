@@ -22,11 +22,12 @@ boolean _irc_performed_on_connect = false;
 boolean _irc_pinged = false;
 boolean _irc_away_status = false;
 long _irc_last_away = 0;
+long _irc_last_nick = 0;
 char _irc_input_buffer[IRC_BUFSIZE];
 int _irc_input_buffer_pointer = 0;
 unsigned long _line_start_time = 0;
 const char * _nickserv_password = "";
-const char * _irc_nick = "irc_client";
+char _irc_nick[16] = "irc_client";
 const char * _version = "";
 const char * _irc_server = "";
 int _irc_server_port = 6667;
@@ -106,17 +107,34 @@ boolean ircConnect(const char * server, int port, boolean reconnect) {
   }
 }
 
-void ircSetNick(const char * name) {  //fixme should this do a NICK after we're connected?
-  _irc_nick = name;
-  char buf[100];
-  snprintf_P(buf, sizeof(buf), PSTR("Set nick to %s"), _irc_nick);
-  ircDebug(buf);
+void ircSetNick(const char * name) {
   if (_irc_ethClient->connected() && _irc_pinged) {
-	ircNetworkLight();
-    _irc_ethClient->print(F("NICK "));
-    _irc_ethClient->print(_irc_nick);
-    _irc_ethClient->print(F("\r\n"));
+	if (millis() - _irc_last_nick >= IRC_RATE_LIMIT) {
+      ircNetworkLight();
+      _irc_ethClient->print(F("NICK "));
+      _irc_ethClient->print(name);
+      _irc_ethClient->print(F("\r\n"));
+      _irc_last_nick = millis();
+    } else {
+      #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+      ircDebug(F("Not changing nick: Rate limited."));
+      #endif
+    }
+  } else {  //not connected to server, update local nick variable directly
+	snprintf(_irc_nick, sizeof(_irc_nick), "%s", name);
+    char buf[100];
+    snprintf_P(buf, sizeof(buf), PSTR("Set nick to %s"), _irc_nick);
+    ircDebug(buf);
   }
+}
+
+const char * ircNick() {
+  #ifdef DEBUG_IRC_VERBOSE
+  char buf[100];
+  snprintf_P(buf, sizeof(buf), PSTR("Nick is currently: %s"), _irc_nick);
+  ircDebug(buf);
+  #endif
+  return(_irc_nick);
 }
 
 void ircSetVersion(const char * version) {
@@ -398,6 +416,23 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
       ircDebug(buf);
       #endif
       return;
+    } else if (strcmp(type, "NICK") == 0) {  //we have a NICK
+      if (strcmp(from, _irc_nick) == 0) {  //our own nick has changed
+        ircNetworkLight();
+        snprintf_P(_irc_nick, sizeof(_irc_nick), PSTR("%s"), to+1);
+		char buf[100];
+        snprintf_P(buf, sizeof(buf), PSTR("Our nick is now %s"), _irc_nick);
+        ircDebug(buf);
+	  } else {
+		#ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+        ircNetworkLight();
+        char buf[100];
+        snprintf_P(buf, sizeof(buf), PSTR("%s changed nick to %s"), from, to+1);
+        ircDebug(buf);
+        #endif
+	  }
+      ircOnNickChange(from, to+1);
+      return;
     } else if (strcmp(type, "MODE") == 0) {  //we have a MODE
       #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
       ircNetworkLight();
@@ -616,9 +651,9 @@ void sendIRCCTCP(const __FlashStringHelper *target, const __FlashStringHelper *m
 	ircNetworkLight();
     _irc_ethClient->print(F("PRIVMSG "));
     _irc_ethClient->print(FPSTR((PGM_P)target));
-    _irc_ethClient->print(F(" :\x01"));
+    _irc_ethClient->print(F(" :\u0001"));
     _irc_ethClient->print(FPSTR((PGM_P)message));
-    _irc_ethClient->print(F("\x01\r\n"));
+    _irc_ethClient->print(F("\u0001\r\n"));
     _irc_last_line_from_server = millis();
   }
 }
@@ -628,9 +663,9 @@ void sendIRCCTCP(const char *target, const __FlashStringHelper *message) {
 	ircNetworkLight();
     _irc_ethClient->print(F("PRIVMSG "));
     _irc_ethClient->print(target);
-    _irc_ethClient->print(F(" :\x01"));
+    _irc_ethClient->print(F(" :\u0001"));
     _irc_ethClient->print(FPSTR((PGM_P)message));
-    _irc_ethClient->print(F("\x01\r\n"));
+    _irc_ethClient->print(F("\u0001\r\n"));
     _irc_last_line_from_server = millis();
   }
 }
@@ -640,9 +675,9 @@ void sendIRCCTCP(const char *target, const char *message) {
 	ircNetworkLight();
 	_irc_ethClient->print(F("PRIVMSG "));
     _irc_ethClient->print(target);
-    _irc_ethClient->print(F(" :\x01"));
+    _irc_ethClient->print(F(" :\u0001"));
     _irc_ethClient->print(message);
-    _irc_ethClient->print(F("\x01\r\n"));
+    _irc_ethClient->print(F("\u0001\r\n"));
     _irc_last_line_from_server = millis();
   }
 }
@@ -652,9 +687,9 @@ void sendIRCAction(const __FlashStringHelper *target, const __FlashStringHelper 
 	ircNetworkLight();
     _irc_ethClient->print(F("PRIVMSG "));
     _irc_ethClient->print(FPSTR((PGM_P)target));
-    _irc_ethClient->print(F(" :\x01" "ACTION "));
+    _irc_ethClient->print(F(" :\u0001" "ACTION "));
     _irc_ethClient->print(FPSTR((PGM_P)message));
-    _irc_ethClient->print(F("\x01\r\n"));
+    _irc_ethClient->print(F("\u0001\r\n"));
     _irc_last_line_from_server = millis();
   }
 }
@@ -664,9 +699,9 @@ void sendIRCAction(const char *target, const __FlashStringHelper *message) {
 	ircNetworkLight();
     _irc_ethClient->print(F("PRIVMSG "));
     _irc_ethClient->print(target);
-    _irc_ethClient->print(F(" :\x01" "ACTION "));
+    _irc_ethClient->print(F(" :\u0001" "ACTION "));
     _irc_ethClient->print(FPSTR((PGM_P)message));
-    _irc_ethClient->print(F("\x01\r\n"));
+    _irc_ethClient->print(F("\u0001\r\n"));
     _irc_last_line_from_server = millis();
   }
 }
@@ -676,9 +711,9 @@ void sendIRCAction(const char *target, const char *message) {
 	ircNetworkLight();
     _irc_ethClient->print(F("PRIVMSG "));
     _irc_ethClient->print(target);
-    _irc_ethClient->print(F(" :\x01" "ACTION "));
+    _irc_ethClient->print(F(" :\u0001" "ACTION "));
     _irc_ethClient->print(message);
-    _irc_ethClient->print(F("\x01\r\n"));
+    _irc_ethClient->print(F("\u0001\r\n"));
     _irc_last_line_from_server = millis();
   }
 }
@@ -917,9 +952,21 @@ void ircOnCTCP(const char * from, const char * to, const char * message) {
     snprintf_P(buf, sizeof(buf), PSTR("Got CTCP VERSION request from <%s>"), from);
     ircDebug(buf);
     #endif
-    snprintf_P(buf, sizeof(buf), PSTR("\x01VERSION %s\x01"), _version);
+    snprintf_P(buf, sizeof(buf), PSTR("\u0001VERSION %s\u0001"), _version);
     sendIRCNotice(from, buf);
 	return;
+  }
+  pch = strstr_P(message,"FINGER");
+  if (pch == &message[0]) {  //respond to CTCP FINGER request
+    ircNetworkLight();
+    char buf[100];
+    #ifdef DEBUG_IRC
+    snprintf_P(buf, sizeof(buf), PSTR("Got CTCP FINGER request from <%s>"), from);
+    ircDebug(buf);
+    #endif
+    snprintf_P(buf, sizeof(buf), PSTR("\u0001FINGER %s\u0001"), _version);
+    sendIRCNotice(from, buf);
+    return;
   }
   pch = strstr_P(message,"PING");
   if (pch == &message[0]) {  //respond to CTCP PING request
@@ -929,7 +976,7 @@ void ircOnCTCP(const char * from, const char * to, const char * message) {
     snprintf_P(buf, sizeof(buf), PSTR("Got CTCP PING request from <%s>"), from);
     ircDebug(buf);
     #endif
-    snprintf_P(buf, sizeof(buf), PSTR("\x01%s\x01"), message);
+    snprintf_P(buf, sizeof(buf), PSTR("\u0001%s\u0001"), message);
     sendIRCNotice(from, buf);
 	return;
   }
@@ -941,7 +988,7 @@ void ircOnCTCP(const char * from, const char * to, const char * message) {
     snprintf_P(buf, sizeof(buf), PSTR("Got CTCP CLIENTINFO request from <%s>"), from);
     ircDebug(buf);
     #endif
-    snprintf_P(buf, sizeof(buf), PSTR("\x01CLIENTINFO ACTION CLIENTINFO PING TIME VERSION\x01"));
+    snprintf_P(buf, sizeof(buf), PSTR("\u0001CLIENTINFO ACTION CLIENTINFO PING TIME VERSION FINGER\u0001"));
     sendIRCNotice(from, buf);
     return;
   }
@@ -957,11 +1004,11 @@ void ircOnCTCP(const char * from, const char * to, const char * message) {
 	time_t now = time(nullptr);
 	struct tm * timeinfo;
 	timeinfo = localtime(&now);
-  	snprintf_P(buf, sizeof(buf), PSTR("\x01TIME %u-%02u-%02u %u:%02u:%02u"),
+  	snprintf_P(buf, sizeof(buf), PSTR("\u0001TIME %u-%02u-%02u %u:%02u:%02u"),
    	  timeinfo->tm_year +1900, timeinfo->tm_mon +1, timeinfo->tm_mday,
       timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
     #else
-	snprintf_P(buf, sizeof(buf), PSTR("\x01TIME %u\x01"), millis());
+	snprintf_P(buf, sizeof(buf), PSTR("\u0001TIME %u\u0001"), millis());
     #endif
 	sendIRCNotice(from, buf);
     return;
@@ -1001,6 +1048,19 @@ void ircOnOp(const char * from, const char * channel) {
     //do nothing
   }
 }
+
+void (*fpOnNickChange)(const char *, const char *);
+void ircSetOnNickChange(void (*fp)(const char *, const char *)) {
+  fpOnNickChange = fp;
+}
+void ircOnNickChange(const char * oldnick, const char * newnick) {
+  if( 0 != fpOnNickChange ) {
+    (*fpOnNickChange)(oldnick, newnick);
+  } else {
+    //do nothing
+  }
+}
+
 
 void (*fpNetworkLightOn)();
 void ircSetNetworkLightOn(void (*fp)(void)) {

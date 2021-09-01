@@ -15,6 +15,8 @@ boolean ircConnect(const char * server, int port, boolean reconnect);
 
 void ircSetNick(const char * name);
 
+const char * ircNick();
+
 void ircSetVersion(const char * version);
 
 void ircSetNickServPassword(const char * password);
@@ -106,6 +108,10 @@ void ircOnVoice(const char * from, const char * channel);
 void ircSetOnOp(void (*fp)(const char *, const char *));
 
 void ircOnOp(const char * from, const char * channel);
+
+void ircSetOnNickChange(void (*fp)(const char *, const char *));
+
+void ircOnNickChange(const char * oldnick, const char * newnick);
 
 void ircSetNetworkLightOn(void (*fp)(void));
 
