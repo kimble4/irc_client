@@ -1,9 +1,10 @@
 #include "irc_client.h"
 #include <Client.h>
 
-#define DEBUG_IRC
+//#define DEBUG_IRC
 //#define DEBUG_IRC_VERBOSE
 #define IRC_BUFSIZE 200  //bytes (default 200)
+#define IRC_NICK_MAX_LENGTH 15
 #define IRC_RECONNECT_INTERVAL 60000  //milliseconds
 #define IRC_TIMEOUT 120000  //milliseconds
 #define NICK_RETRY 20000
@@ -27,7 +28,7 @@ char _irc_input_buffer[IRC_BUFSIZE];
 int _irc_input_buffer_pointer = 0;
 unsigned long _line_start_time = 0;
 const char * _nickserv_password = "";
-char _irc_nick[16] = "irc_client";
+char _irc_nick[IRC_NICK_MAX_LENGTH + 1] = "irc_client";
 const char * _version = "";
 const char * _irc_server = "";
 int _irc_server_port = 6667;
