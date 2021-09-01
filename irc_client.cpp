@@ -109,7 +109,7 @@ boolean ircConnect(const char * server, int port, boolean reconnect) {
 
 void ircSetNick(const char * name) {
   if (_irc_ethClient->connected() && _irc_pinged) {
-	if (millis() - _irc_last_nick >= IRC_RATE_LIMIT) {
+    if (millis() - _irc_last_nick >= IRC_RATE_LIMIT) {
       ircNetworkLight();
       _irc_ethClient->print(F("NICK "));
       _irc_ethClient->print(name);
@@ -121,7 +121,7 @@ void ircSetNick(const char * name) {
       #endif
     }
   } else {  //not connected to server, update local nick variable directly
-	snprintf(_irc_nick, sizeof(_irc_nick), "%s", name);
+    snprintf(_irc_nick, sizeof(_irc_nick), "%s", name);
     char buf[100];
     snprintf_P(buf, sizeof(buf), PSTR("Set nick to %s"), _irc_nick);
     ircDebug(buf);
@@ -420,17 +420,17 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
       if (strcmp(from, _irc_nick) == 0) {  //our own nick has changed
         ircNetworkLight();
         snprintf_P(_irc_nick, sizeof(_irc_nick), PSTR("%s"), to+1);
-		char buf[100];
+        char buf[100];
         snprintf_P(buf, sizeof(buf), PSTR("Our nick is now %s"), _irc_nick);
         ircDebug(buf);
-	  } else {
-		#ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+      } else {
+        #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
         ircNetworkLight();
         char buf[100];
         snprintf_P(buf, sizeof(buf), PSTR("%s changed nick to %s"), from, to+1);
         ircDebug(buf);
         #endif
-	  }
+      }
       ircOnNickChange(from, to+1);
       return;
     } else if (strcmp(type, "MODE") == 0) {  //we have a MODE
@@ -445,11 +445,11 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
       strcat(test_string, _irc_nick);
       pch = strstr_P(message, test_string);
       if (pch != NULL) {
-		#ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+        #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
         char buf[100];
         snprintf_P(buf, sizeof(buf), PSTR("Got voice on %s"), to);
         ircDebug(buf);
-		#endif
+	    #endif
         ircOnVoice(from, to);
         return;
       }
@@ -457,11 +457,11 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
       strcat(test_string, _irc_nick);
       pch = strstr_P(message, test_string);
       if (pch != NULL) {
-		#ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+        #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
         char buf[100];
         snprintf_P(buf, sizeof(buf), PSTR("Got ops on %s"), to);
         ircDebug(buf);
-		#endif
+        #endif
         ircOnOp(from, to);
         return;
       }
@@ -479,14 +479,14 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
       snprintf_P(buf, sizeof(buf), PSTR("RPL_UNAWAY: %s"), message);
       ircDebug(buf);
       #endif
-	  _irc_away_status = false;
+      _irc_away_status = false;
     } else if (strcmp(type, "306") == 0 && strcmp(to, _irc_nick) == 0) {  //we are now AWAY
       #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
       char buf[100];
       snprintf_P(buf, sizeof(buf), PSTR("RPL_NOWAWAY: %s"), message);
       ircDebug(buf);
       #endif
-	  _irc_away_status = true;
+      _irc_away_status = true;
     }
     //test for error codes
     int err = atoi(type);
@@ -504,16 +504,16 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
       } else {
         snprintf_P(error_string, sizeof(error_string), PSTR("Unknown error, continuing..."));
       }
-	  char buf[100];
-	  snprintf_P(buf, sizeof(buf), PSTR("Message is an error (%i): %s"), err, error_string);
+      char buf[100];
+      snprintf_P(buf, sizeof(buf), PSTR("Message is an error (%i): %s"), err, error_string);
       ircDebug(buf);
-	  if (err >= 431 && err <= 436) {  //disconnect on nick error
-		_irc_last_connect_attempt = millis() - IRC_RECONNECT_INTERVAL + NICK_RETRY;
+      if (err >= 431 && err <= 436) {  //disconnect on nick error
+        _irc_last_connect_attempt = millis() - IRC_RECONNECT_INTERVAL + NICK_RETRY;
         _irc_ethClient->stop();
         snprintf_P(buf, sizeof(buf), PSTR("Connection closed."));
         ircDebug(buf);
         return;
-	  }
+      }
     }
     return;
   }
