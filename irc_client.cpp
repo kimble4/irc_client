@@ -821,14 +821,14 @@ void ircMode(const char *command) {
 }
 
 void ircDisconnect() {
-  ircDisconnect("Exiting.");
+  ircDisconnect(F("Exiting."));
 }
 
 void ircDisconnect(const __FlashStringHelper *quitmsg) {
   if (_irc_ethClient != NULL) {
     ircNetworkLight();
     _irc_ethClient->print(F("QUIT :"));
-    _irc_ethClient->print(PSTR((PGM_P)quitmsg));
+    _irc_ethClient->print(FPSTR((PGM_P)quitmsg));
     _irc_ethClient->print(F("\r\n"));
     //shut down the client for good measure
     _irc_ethClient->stop();
