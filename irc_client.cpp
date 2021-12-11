@@ -725,7 +725,7 @@ void setAway() {
 
 void setAway(const char *message) {
   if (!_irc_away_status && _irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
-	if ( millis() - _irc_last_away >= IRC_RATE_LIMIT) {
+	if (millis() - _irc_last_away >= IRC_RATE_LIMIT) {
 	  #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
       char buf[100];
       snprintf_P(buf, sizeof(buf), PSTR("Setting AWAY: %s"), message);
@@ -736,7 +736,7 @@ void setAway(const char *message) {
 	  _irc_ethClient->print(message);
 	  _irc_ethClient->print(F("\r\n"));
       _irc_last_line_from_server = millis();
-	 _irc_last_away = millis();
+	  _irc_last_away = millis();
     } else {
       #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
       ircDebug(F("Not setting AWAY: Rate limited."));
@@ -821,8 +821,28 @@ void ircMode(const char *command) {
 }
 
 void ircDisconnect() {
+  ircDisconnect("Exiting.");
+}
+
+void ircDisconnect(const __FlashStringHelper *quitmsg) {
+  if (_irc_ethClient != NULL) {
+    ircNetworkLight();
+    _irc_ethClient->print(F("QUIT :"));
+    _irc_ethClient->print(PSTR((PGM_P)quitmsg));
+    _irc_ethClient->print(F("\r\n"));
+    //shut down the client for good measure
+    _irc_ethClient->stop();
+  }
+  _irc_server = "";
+}
+
+void ircDisconnect(const char *quitmsg) {
   if (_irc_ethClient != NULL) {
 	ircNetworkLight();
+	_irc_ethClient->print(F("QUIT :"));
+	_irc_ethClient->print(quitmsg);
+    _irc_ethClient->print(F("\r\n"));
+	//shut down the client for good measure
     _irc_ethClient->stop();
   }
   _irc_server = "";

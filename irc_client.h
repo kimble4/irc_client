@@ -71,6 +71,10 @@ void ircMode(const char *command);
 
 void ircDisconnect();
 
+void ircDisconnect(const __FlashStringHelper *quitmsg);
+
+void ircDisconnect(const char *quitmsg);
+
 void ircSetOnConnect(void (*fp)(void));
 
 void ircOnConnect();
