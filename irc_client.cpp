@@ -551,7 +551,7 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
   }
   //if we get here, we don't know how to parse the line.
   char buf[IRC_BUFSIZE+20];
-  snprintf_P(buf, sizeof(buf), PSTR("Could not parse %s"), _irc_input_buffer);
+  snprintf_P(buf, sizeof(buf), PSTR("Could not parse \"%s\""), _irc_input_buffer);
   ircDebug(buf);
 }
 
