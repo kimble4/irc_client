@@ -223,6 +223,7 @@ void doIRC() {
       }
       if (c == '\n') {  //got end of line.
         _irc_last_line_from_server = millis();
+		ircNetworkLight();
         boolean buffer_overflow = false;
         _irc_input_buffer[_irc_input_buffer_pointer - 2] = '\0';
         #ifdef DEBUG_IRC_VERBOSE
@@ -263,7 +264,7 @@ void doIRC() {
   }
 }
 
-void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a line of IRC, do something with it
+boolean parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a line of IRC, do something with it, returns true if parsed successfully
   char * pch;
   if (_irc_input_buffer[0] == ':') {  //if the line starts with a ':', as most lines do...
     //get the from field
@@ -324,7 +325,6 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
           ircOnCTCP(from, to, message);
         } else {  //normal private /MSG
           #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
-          ircNetworkLight();
           char buf[100];
           snprintf_P(buf, sizeof(buf), PSTR("MSG <%s> %s"), from, message);
           ircDebug(buf);
@@ -339,7 +339,6 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
           ircOnCTCP(from, to, message);
         } else {  //normal message
           #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
-          ircNetworkLight();;
           char buf[100];
           snprintf_P(buf, sizeof(buf), PSTR("%s <%s> %s"), to, from, message);
           ircDebug(buf);
@@ -347,24 +346,22 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
           ircOnChannelMessage(from, to, message);
         }
       }
-      return;
+      return true;
     } else if (strcmp(type, "NOTICE") == 0) {  //we have a NOTICE
       if (strcmp(to, _irc_nick) == 0) { //this is a private NOTICE
         #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
-        ircNetworkLight();
         char buf[100];
         snprintf_P(buf, sizeof(buf), PSTR("NOTICE <%s> %s"), from, message);
         ircDebug(buf);
         #endif
         if (strcmp(from, "NickServ") == 0) {  //notice from NickServ
-          ircNetworkLight();
           pch = strstr_P(message, "Password accepted");
           if (pch != NULL) {
             _irc_identified = IDENTIFY_CONFIRMED;
             char buf[100];
             snprintf_P(buf, sizeof(buf), PSTR("Identified: %s"), message);
             ircDebug(buf);
-            return;
+            return true;
           }
           pch = strstr_P(message, "This nickname is registered and protected.");
           if (pch != NULL) {
@@ -375,35 +372,32 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
               ircDebug(F("WARNING: No nickserv password is set!\r\n"));
             }
 			#endif
-            return;
+            return true;
           }
           char buf[100];
           snprintf_P(buf, sizeof(buf), PSTR("Ignoring NiceServ NOTICE: %s"), message);
           ircDebug(buf);
-          return;
+          return true;
 	    }
         //some other private notice
         #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
-        ircNetworkLight();
         snprintf_P(buf, sizeof(buf), PSTR("Got private notice from <%s> %s"), from, message);
         ircDebug(buf);
         #endif
         ircOnPrivateNotice(from, message);
       } else {  //channel notice
         #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
-        ircNetworkLight();
         char buf[100];
         snprintf_P(buf, sizeof(buf), PSTR("%s <%s> NOTICE: %s"), to, from, message);
         ircDebug(buf);
         #endif
         if (strcmp(to, "AUTH") == 0) { //this is an AUTH notice
           #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
-          ircNetworkLight();
           char buf[100];
           snprintf_P(buf, sizeof(buf), PSTR("Ignoring AUTH NOTICE: %s"), message);
           ircDebug(buf);
           #endif
-          return;
+          return true;
         } else {
           ircOnChannelNotice(from, to, message);
         }
@@ -411,32 +405,28 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
       }
     } else if (strcmp(type, "JOIN") == 0) {  //we have a JOIN
       #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
-      ircNetworkLight();
       char buf[100];
       snprintf_P(buf, sizeof(buf), PSTR("%s joined %s"), from, to+1);
       ircDebug(buf);
       #endif
-      return;
+      return true;
     } else if (strcmp(type, "NICK") == 0) {  //we have a NICK
       if (strcmp(from, _irc_nick) == 0) {  //our own nick has changed
-        ircNetworkLight();
         snprintf_P(_irc_nick, sizeof(_irc_nick), PSTR("%s"), to+1);
         char buf[100];
         snprintf_P(buf, sizeof(buf), PSTR("Our nick is now %s"), _irc_nick);
         ircDebug(buf);
       } else {
         #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
-        ircNetworkLight();
         char buf[100];
         snprintf_P(buf, sizeof(buf), PSTR("%s changed nick to %s"), from, to+1);
         ircDebug(buf);
         #endif
       }
       ircOnNickChange(from, to+1);
-      return;
+      return true;
     } else if (strcmp(type, "MODE") == 0) {  //we have a MODE
       #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
-      ircNetworkLight();
       char buf[100];
       snprintf_P(buf, sizeof(buf), PSTR("%s set mode: %s on %s"), from, message, to);
       ircDebug(buf);
@@ -452,7 +442,7 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
         ircDebug(buf);
 	    #endif
         ircOnVoice(from, to);
-        return;
+        return true;
       }
       strcpy(test_string, "+o ");
       strcat(test_string, _irc_nick);
@@ -464,16 +454,17 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
         ircDebug(buf);
         #endif
         ircOnOp(from, to);
-        return;
+        return true;
       }
       //handle other mode here?
-      return;
+      return false;
     } else if (strcmp(type, "301") == 0) {  //user is AWAY
       #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
       char buf[100];
       snprintf_P(buf, sizeof(buf), PSTR("RPL_AWAY: %s"), message);
       ircDebug(buf);
       #endif
+      return true;
     } else if (strcmp(type, "305") == 0 && strcmp(to, _irc_nick) == 0) {  //we are no longer AWAY
       #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
       char buf[100];
@@ -481,6 +472,7 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
       ircDebug(buf);
       #endif
       _irc_away_status = false;
+      return true;
     } else if (strcmp(type, "306") == 0 && strcmp(to, _irc_nick) == 0) {  //we are now AWAY
       #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
       char buf[100];
@@ -488,11 +480,11 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
       ircDebug(buf);
       #endif
       _irc_away_status = true;
+      return true;
     }
     //test for error codes
     int err = atoi(type);
     if (err >= 400 && err <= 502) {
-      ircNetworkLight();
       char error_string[100];
       if (err >= 401 && err <= 403) {
         snprintf_P(error_string, sizeof(error_string), PSTR("Target does not exist."));
@@ -513,15 +505,14 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
         _irc_ethClient->stop();
         snprintf_P(buf, sizeof(buf), PSTR("Connection closed."));
         ircDebug(buf);
-        return;
+        return true;
       }
     }
-    return;
+    return true;
   }
   //respond to server PING
   pch = strstr_P(_irc_input_buffer,"PING :");
   if (pch == &_irc_input_buffer[0]) {
-    ircNetworkLight();
     _irc_last_line_from_server = millis();
     char ping_string[31];
     strlcpy (ping_string, pch+6, 30);
@@ -534,12 +525,11 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
     _irc_ethClient->print(ping_string);
     _irc_ethClient->print("\r\n");
     _irc_pinged = true;
-    return;
+    return true;
   }
   //now test for ERROR
   pch = strstr_P(_irc_input_buffer,"ERROR :");
   if (pch == &_irc_input_buffer[0]) {
-    ircNetworkLight();
     char buf[IRC_BUFSIZE+20];
     snprintf_P(buf, sizeof(buf), PSTR("Got ERROR from server: %s"), pch+7);
     ircDebug(buf);
@@ -547,12 +537,11 @@ void parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a li
     _irc_ethClient->stop();
     snprintf_P(buf, sizeof(buf), PSTR("Connection closed."));
     ircDebug(buf);
-    return;
+    return true;
   }
   //if we get here, we don't know how to parse the line.
-  char buf[IRC_BUFSIZE+20];
-  snprintf_P(buf, sizeof(buf), PSTR("Could not parse \"%s\""), _irc_input_buffer);
-  ircDebug(buf);
+  ircOnRaw(_irc_input_buffer);
+  return false;
 }
 
 void joinIRCChannel(const __FlashStringHelper *channel) {
@@ -949,7 +938,6 @@ void ircOnCTCP(const char * from, const char * to, const char * message) {
   char * pch;
   pch = strstr_P(message,"ACTION");
   if (pch == &message[0]) {  //respond to CTCP ACTION
-	ircNetworkLight();
     char buf[100];
     #ifdef DEBUG_IRC
     snprintf_P(buf, sizeof(buf), PSTR("* %s %s"), from, message+7);
@@ -967,7 +955,6 @@ void ircOnCTCP(const char * from, const char * to, const char * message) {
   }
   pch = strstr_P(message,"VERSION");
   if (pch == &message[0]) {  //respond to CTCP VERSION request
-	ircNetworkLight();
 	char buf[100];
     #ifdef DEBUG_IRC
     snprintf_P(buf, sizeof(buf), PSTR("Got CTCP VERSION request from <%s>"), from);
@@ -979,7 +966,6 @@ void ircOnCTCP(const char * from, const char * to, const char * message) {
   }
   pch = strstr_P(message,"FINGER");
   if (pch == &message[0]) {  //respond to CTCP FINGER request
-    ircNetworkLight();
     char buf[100];
     #ifdef DEBUG_IRC
     snprintf_P(buf, sizeof(buf), PSTR("Got CTCP FINGER request from <%s>"), from);
@@ -991,7 +977,6 @@ void ircOnCTCP(const char * from, const char * to, const char * message) {
   }
   pch = strstr_P(message,"PING");
   if (pch == &message[0]) {  //respond to CTCP PING request
-    ircNetworkLight();
 	char buf[100];
     #ifdef DEBUG_IRC
     snprintf_P(buf, sizeof(buf), PSTR("Got CTCP PING request from <%s>"), from);
@@ -1003,7 +988,6 @@ void ircOnCTCP(const char * from, const char * to, const char * message) {
   }
   pch = strstr_P(message,"CLIENTINFO");
   if (pch == &message[0]) {  //respond to CTCP CLIENTINFO
-	ircNetworkLight();
     char buf[100];
     #ifdef DEBUG_IRC
     snprintf_P(buf, sizeof(buf), PSTR("Got CTCP CLIENTINFO request from <%s>"), from);
@@ -1015,7 +999,6 @@ void ircOnCTCP(const char * from, const char * to, const char * message) {
   }
   pch = strstr_P(message,"TIME");
   if (pch == &message[0]) {  //respond to CTCP TIME
-	ircNetworkLight();
     char buf[100];
     #ifdef DEBUG_IRC
     snprintf_P(buf, sizeof(buf), PSTR("Got CTCP TIME request from <%s>"), from);
@@ -1035,7 +1018,6 @@ void ircOnCTCP(const char * from, const char * to, const char * message) {
     return;
   }
   if (0 != fpOnCTCP ) {
-	ircNetworkLight();
     (*fpOnCTCP)(from, to, message);
   } else {
     #ifdef DEBUG_IRC_VERBOSE
@@ -1082,6 +1064,19 @@ void ircOnNickChange(const char * oldnick, const char * newnick) {
   }
 }
 
+void (*fpOnRaw)(const char *);
+void ircSetOnRaw(void (*fp)(const char *)) {
+  fpOnRaw = fp;
+}
+void ircOnRaw(const char * line){
+  if( 0 != fpOnRaw ) {
+    (*fpOnRaw)(line);
+  } else {
+    char buf[IRC_BUFSIZE+20];
+    snprintf_P(buf, sizeof(buf), PSTR("Could not parse \"%s\""), _irc_input_buffer);
+    ircDebug(buf);
+  }
+}
 
 void (*fpNetworkLightOn)();
 void ircSetNetworkLightOn(void (*fp)(void)) {

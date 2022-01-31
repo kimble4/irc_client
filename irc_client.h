@@ -23,7 +23,7 @@ void ircSetNickServPassword(const char * password);
 
 void doIRC();
 
-void parseIRCInput(boolean buffer_overflow);
+boolean parseIRCInput(boolean buffer_overflow);
 
 void joinIRCChannel(const __FlashStringHelper *channel);
 
@@ -116,6 +116,10 @@ void ircOnOp(const char * from, const char * channel);
 void ircSetOnNickChange(void (*fp)(const char *, const char *));
 
 void ircOnNickChange(const char * oldnick, const char * newnick);
+
+void ircSetOnRaw(void (*fp)(const char *));
+
+void ircOnRaw(const char * line);
 
 void ircSetNetworkLightOn(void (*fp)(void));
 
