@@ -213,15 +213,24 @@ void doIRC() {
       ircOnConnect();
     }
     while (_irc_ethClient->available()) {
+	  char c = _irc_ethClient->read();
+	  boolean skip_char = false;
       if (_irc_input_buffer_pointer == 0) {
         _line_start_time = millis();  //reset this on first char of line
+        if (!(c == ':' || isalpha(c))) {  //discard invalid starting characters
+          #ifdef DEBUG_IRC
+          char buf[IRC_BUFSIZE+100];
+	      snprintf_P(buf, sizeof(buf), PSTR("Discarded leading character: %c"), c);
+    	  ircDebug(buf);
+          #endif
+          skip_char = true;
+        }
       }
-      char c = _irc_ethClient->read();
-      if (_irc_input_buffer_pointer < sizeof(_irc_input_buffer)) {
+      if (!skip_char && _irc_input_buffer_pointer < sizeof(_irc_input_buffer)) {  //add character to buffer
         _irc_input_buffer[_irc_input_buffer_pointer] = c;
         _irc_input_buffer_pointer++;
       }
-      if (c == '\n') {  //got end of line.
+      if (!skip_char && c == '\n') {  //got end of line.
         _irc_last_line_from_server = millis();
 		ircNetworkLight();
         boolean buffer_overflow = false;
