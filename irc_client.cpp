@@ -26,7 +26,9 @@ long _irc_last_away = 0;
 long _irc_last_nick = 0;
 char _irc_input_buffer[IRC_BUFSIZE];
 int _irc_input_buffer_pointer = 0;
-unsigned long _line_start_time = 0;
+#ifdef IRC_DEBUG_VERBOSE
+unsigned long _irc_line_start_time = 0;
+#endif
 const char * _nickserv_password = "";
 char _irc_nick[IRC_NICK_MAX_LENGTH + 1] = "irc_client";
 const char * _version = "";
@@ -214,45 +216,46 @@ void doIRC() {
     }
     while (_irc_ethClient->available()) {
 	  char c = _irc_ethClient->read();
-	  boolean skip_char = false;
-      if (_irc_input_buffer_pointer == 0) {
-        _line_start_time = millis();  //reset this on first char of line
-        if (!(c == ':' || isalpha(c))) {  //discard invalid starting characters
-          #ifdef DEBUG_IRC
-          char buf[IRC_BUFSIZE+100];
-	      snprintf_P(buf, sizeof(buf), PSTR("Discarded leading character: %c"), c);
-    	  ircDebug(buf);
-          #endif
-          skip_char = true;
-        }
-      }
-      if (!skip_char && _irc_input_buffer_pointer < sizeof(_irc_input_buffer)) {  //add character to buffer
-        _irc_input_buffer[_irc_input_buffer_pointer] = c;
-        _irc_input_buffer_pointer++;
-      }
-      if (!skip_char && c == '\n') {  //got end of line.
-        _irc_last_line_from_server = millis();
-		ircNetworkLight();
-        boolean buffer_overflow = false;
-        _irc_input_buffer[_irc_input_buffer_pointer - 2] = '\0';
-        #ifdef DEBUG_IRC_VERBOSE
-        char buf[IRC_BUFSIZE+100];
-        snprintf_P(buf, sizeof(buf), PSTR("Got EOL after %5ums.  Buffer contains %u bytes: %s"), _irc_last_line_from_server - _line_start_time, _irc_input_buffer_pointer, _irc_input_buffer);
-        ircDebug(buf);
-        #endif
-        if (_irc_input_buffer_pointer >= sizeof(_irc_input_buffer)) {
+      if (_irc_input_buffer_pointer == 0) {  //if this is the first char of the line
+        if (c == ':' || isalpha(c)) {  //char is valid starting character
           #ifdef DEBUG_IRC_VERBOSE
-          ircDebug(F(" (OVERFLOW!)"));
+          _irc_line_start_time = millis();
           #endif
-          buffer_overflow = true;
+          _irc_input_buffer[_irc_input_buffer_pointer] = c;
+          _irc_input_buffer_pointer++;
+        } else {
+          #ifdef DEBUG_IRC_VERBOSE
+          char buf[IRC_BUFSIZE+100];
+          snprintf_P(buf, sizeof(buf), PSTR("Discarded leading character: %i"), c);
+          ircDebug(buf);
+          #endif
         }
-        #ifdef DEBUG_IRC_VERBOSE
-        ircDebug(F("\r\n"));
-        #endif
-        parseIRCInput(buffer_overflow);
-        //reset buffer for next time
-        memset(_irc_input_buffer, 0, sizeof(_irc_input_buffer));
-        _irc_input_buffer_pointer = 0;
+      } else {  //not the first char of the line
+        if (c == '\r' || c == '\r') {  //got end of line
+          _irc_last_line_from_server = millis();
+          ircNetworkLight();
+          boolean buffer_overflow = false;
+          #ifdef DEBUG_IRC_VERBOSE
+          char buf[IRC_BUFSIZE+100];
+          snprintf_P(buf, sizeof(buf), PSTR("Got EOL after %5ums.  Buffer contains %u bytes: %s"),
+            _irc_last_line_from_server - _irc_line_start_time, _irc_input_buffer_pointer, _irc_input_buffer);
+          ircDebug(buf);
+          #endif
+          if (_irc_input_buffer_pointer >= sizeof(_irc_input_buffer)) {
+            #ifdef DEBUG_IRC_VERBOSE
+            ircDebug(F("BUFFER OVERFLOWED!"));
+            #endif
+            buffer_overflow = true;
+          }
+          //parse the contents of the buffer
+          parseIRCInput(buffer_overflow);
+          //reset buffer for next time - ensures string is null-terminated!
+          memset(_irc_input_buffer, 0, sizeof(_irc_input_buffer));
+          _irc_input_buffer_pointer = 0;
+        } else if (_irc_input_buffer_pointer < sizeof(_irc_input_buffer)) {  //add character to buffer
+          _irc_input_buffer[_irc_input_buffer_pointer] = c;
+          _irc_input_buffer_pointer++;
+        }
       }
     }
     if (millis() - _irc_last_line_from_server >= IRC_TIMEOUT) {
@@ -264,7 +267,7 @@ void doIRC() {
     }
   } else {  //client is not connected
     if (_irc_pinged) {
-      ircDebug(F("Disconnected for some reason!"));
+      ircDebug(F("Disconnected!"));
       _irc_last_connect_attempt = millis();
       _irc_pinged = false;
       _irc_performed_on_connect = false;
@@ -490,6 +493,8 @@ boolean parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a
       #endif
       _irc_away_status = true;
       return true;
+    //} else if (strcmp(type, "353") == 0) {  //names list
+    //} else if (strcmp(type, "366") == 0) {  //end of names list
     }
     //test for error codes
     int err = atoi(type);
