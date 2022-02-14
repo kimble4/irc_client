@@ -1,8 +1,8 @@
 #include "irc_client.h"
 #include <Client.h>
 
-//#define DEBUG_IRC
-//#define DEBUG_IRC_VERBOSE
+//#define IRC_DEBUG
+//#define IRC_DEBUG_VERBOSE
 #define IRC_BUFSIZE 200  //bytes (default 200)
 #define IRC_NICK_MAX_LENGTH 15
 #define IRC_RECONNECT_INTERVAL 60000  //milliseconds
@@ -29,6 +29,7 @@ int _irc_input_buffer_pointer = 0;
 #ifdef IRC_DEBUG_VERBOSE
 unsigned long _irc_line_start_time = 0;
 #endif
+const char * _irc_server_password = "";
 const char * _nickserv_password = "";
 char _irc_nick[IRC_NICK_MAX_LENGTH + 1] = "irc_client";
 const char * _version = "";
@@ -38,7 +39,7 @@ int _irc_server_port = 6667;
 
 void ircSetClient(Client &client) {
   _irc_ethClient = &client;
-  #ifdef DEBUG_IRC_VERBOSE
+  #ifdef IRC_DEBUG_VERBOSE
   ircDebug(F("Network Client set."));
   #endif
 }
@@ -88,15 +89,24 @@ boolean ircConnect(const char * server, int port, boolean reconnect) {
       ircNetworkLight();
       snprintf_P(buf, sizeof(buf), PSTR("Connected to %s:%u"), server, port);
       ircDebug(buf);
-      _irc_ethClient->print(F("USER "));
+      if (strlen(_irc_server_password)) {
+        #ifdef IRC_DEBUG
+        snprintf_P(buf, sizeof(buf), PSTR("Using server password \"%s\""), _irc_server_password);
+        ircDebug(buf);
+        #endif
+        _irc_ethClient->print(F("PASS "));
+        _irc_ethClient->print(_irc_server_password);
+        _irc_ethClient->print(F("\r\n"));
+      }
+      _irc_ethClient->print(F("NICK "));
+      _irc_ethClient->print(_irc_nick);
+      _irc_ethClient->print(F("\r\nUSER "));
 	  //remove illegal characters from username
 	  snprintf(buf, sizeof(buf), "%s", _irc_nick);
 	  stringRemoveNonPermitted(buf);
       _irc_ethClient->print(buf);
       _irc_ethClient->print(F(" 8 * :"));
       _irc_ethClient->print(_version);
-      _irc_ethClient->print(F("\r\nNICK "));
-      _irc_ethClient->print(_irc_nick);
       _irc_ethClient->print(F("\r\n"));
       return(true);
     } else {
@@ -119,7 +129,7 @@ void ircSetNick(const char * name) {
       _irc_ethClient->print(F("\r\n"));
       _irc_last_nick = millis();
     } else {
-      #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+      #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
       ircDebug(F("Not changing nick: Rate limited."));
       #endif
     }
@@ -132,7 +142,7 @@ void ircSetNick(const char * name) {
 }
 
 const char * ircNick() {
-  #ifdef DEBUG_IRC_VERBOSE
+  #ifdef IRC_DEBUG_VERBOSE
   char buf[100];
   snprintf_P(buf, sizeof(buf), PSTR("Nick is currently: %s"), _irc_nick);
   ircDebug(buf);
@@ -144,6 +154,13 @@ void ircSetVersion(const char * version) {
   _version = version;
   char buf[100];
   snprintf_P(buf, sizeof(buf), PSTR("Set version to: %s"), _version);
+  ircDebug(buf);
+}
+
+void ircSetServerPassword(const char * password) {
+  _irc_server_password = password;
+  char buf[100];
+  snprintf_P(buf, sizeof(buf), PSTR("Setting server password to \"%s\""), _irc_server_password);
   ircDebug(buf);
 }
 
@@ -174,15 +191,24 @@ void doIRC() {
       ircNetworkLight();
       snprintf_P(buf, sizeof(buf), PSTR("Connected to %s:%u"), _irc_server, _irc_server_port);
       ircDebug(buf);
-      _irc_ethClient->print(F("USER "));
-	  //remove illegal characters from username
+      if (strlen(_irc_server_password)) {
+		#ifdef IRC_DEBUG
+        snprintf_P(buf, sizeof(buf), PSTR("Using server password \"%s\""), _irc_server_password);
+        ircDebug(buf);
+        #endif
+        _irc_ethClient->print(F("PASS "));
+        _irc_ethClient->print(_irc_server_password);
+        _irc_ethClient->print(F("\r\n"));
+      }
+      _irc_ethClient->print(F("NICK "));
+      _irc_ethClient->print(_irc_nick);
+      _irc_ethClient->print(F("\r\nUSER "));
+      //remove illegal characters from username
       snprintf(buf, sizeof(buf), "%s", _irc_nick);
       stringRemoveNonPermitted(buf);
       _irc_ethClient->print(buf);
       _irc_ethClient->print(F(" 8 * :"));
       _irc_ethClient->print(_version);
-      _irc_ethClient->print(F("\r\nNICK "));
-      _irc_ethClient->print(_irc_nick);
       _irc_ethClient->print(F("\r\n"));
     } else {
       snprintf_P(buf, sizeof(buf), PSTR("Connection failed!"));
@@ -193,7 +219,7 @@ void doIRC() {
   if (_irc_ethClient->connected()) {
     if (strlen(_nickserv_password) > 0 && _irc_identified == NOT_IDENTIFIED && _irc_pinged) {  // we've pinged and nickserv wants auth, now identify with nickserv
       ircNetworkLight();
-	  #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+	  #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
       ircDebug(F("Identifying..."));
 	  #endif
       char buf[50];
@@ -203,12 +229,12 @@ void doIRC() {
     }
     if (!_irc_performed_on_connect && _irc_pinged && (_irc_identified == IDENTIFY_CONFIRMED || millis() - _irc_last_connect_attempt > NICKSERV_TIMEOUT)) {  //we're identified (or timed out), now join channels
       if (_irc_identified != IDENTIFY_CONFIRMED) {
-        #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+        #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
 		ircDebug(F("NickServ timed out!"));
 		#endif
         _irc_identified = WAITING_FOR_NICKSERV;
       }
-      #ifdef DEBUG_IRC
+      #ifdef IRC_DEBUG
       ircDebug(F("Performing onConnect()"));
       #endif
       _irc_performed_on_connect = true;
@@ -218,13 +244,13 @@ void doIRC() {
 	  char c = _irc_ethClient->read();
       if (_irc_input_buffer_pointer == 0) {  //if this is the first char of the line
         if (c == ':' || isalpha(c)) {  //char is valid starting character
-          #ifdef DEBUG_IRC_VERBOSE
+          #ifdef IRC_DEBUG_VERBOSE
           _irc_line_start_time = millis();
           #endif
           _irc_input_buffer[_irc_input_buffer_pointer] = c;
           _irc_input_buffer_pointer++;
         } else {
-          #ifdef DEBUG_IRC_VERBOSE
+          #ifdef IRC_DEBUG_VERBOSE
           char buf[IRC_BUFSIZE+100];
           snprintf_P(buf, sizeof(buf), PSTR("Discarded leading character: %i"), c);
           ircDebug(buf);
@@ -235,14 +261,14 @@ void doIRC() {
           _irc_last_line_from_server = millis();
           ircNetworkLight();
           boolean buffer_overflow = false;
-          #ifdef DEBUG_IRC_VERBOSE
+          #ifdef IRC_DEBUG_VERBOSE
           char buf[IRC_BUFSIZE+100];
           snprintf_P(buf, sizeof(buf), PSTR("Got EOL after %5ums.  Buffer contains %u bytes: %s"),
             _irc_last_line_from_server - _irc_line_start_time, _irc_input_buffer_pointer, _irc_input_buffer);
           ircDebug(buf);
           #endif
           if (_irc_input_buffer_pointer >= sizeof(_irc_input_buffer)) {
-            #ifdef DEBUG_IRC_VERBOSE
+            #ifdef IRC_DEBUG_VERBOSE
             ircDebug(F("BUFFER OVERFLOWED!"));
             #endif
             buffer_overflow = true;
@@ -291,7 +317,7 @@ boolean parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a
       from[nick_length] = '\0';
       user = &from[nick_length + 1];
     }
-    #ifdef DEBUG_IRC_VERBOSE
+    #ifdef IRC_DEBUG_VERBOSE
     char buf[IRC_BUFSIZE+100];
     if (user != NULL) {
       snprintf_P(buf, sizeof(buf), PSTR("Message from: %s (%s)"), from, user);
@@ -305,7 +331,7 @@ boolean parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a
     length = strcspn(_irc_input_buffer+start_pos, " ");
     char * type = &_irc_input_buffer[start_pos];
     _irc_input_buffer[start_pos+length] = '\0';
-    #ifdef DEBUG_IRC_VERBOSE
+    #ifdef IRC_DEBUG_VERBOSE
     snprintf_P(buf, sizeof(buf), PSTR("Message type: %s"), type);
     ircDebug(buf);
     #endif
@@ -314,7 +340,7 @@ boolean parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a
     length = strcspn(_irc_input_buffer+start_pos, " ");
     char * to = &_irc_input_buffer[start_pos];
     _irc_input_buffer[start_pos+length] = '\0';
-    #ifdef DEBUG_IRC_VERBOSE
+    #ifdef IRC_DEBUG_VERBOSE
     snprintf_P(buf, sizeof(buf), PSTR("Message   to: %s"), to);
     ircDebug(buf);
     #endif
@@ -324,7 +350,7 @@ boolean parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a
       start_pos++;
     }
     char * message = &_irc_input_buffer[start_pos];
-    #ifdef DEBUG_IRC_VERBOSE
+    #ifdef IRC_DEBUG_VERBOSE
     snprintf_P(buf, sizeof(buf), PSTR("Message body: %s"), message);
     ircDebug(buf);
     #endif
@@ -336,7 +362,7 @@ boolean parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a
           message[length] = '\0';
           ircOnCTCP(from, to, message);
         } else {  //normal private /MSG
-          #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+          #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
           char buf[100];
           snprintf_P(buf, sizeof(buf), PSTR("MSG <%s> %s"), from, message);
           ircDebug(buf);
@@ -350,7 +376,7 @@ boolean parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a
           message[length] = '\0';
           ircOnCTCP(from, to, message);
         } else {  //normal message
-          #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+          #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
           char buf[100];
           snprintf_P(buf, sizeof(buf), PSTR("%s <%s> %s"), to, from, message);
           ircDebug(buf);
@@ -361,7 +387,7 @@ boolean parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a
       return true;
     } else if (strcmp(type, "NOTICE") == 0) {  //we have a NOTICE
       if (strcmp(to, _irc_nick) == 0) { //this is a private NOTICE
-        #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+        #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
         char buf[100];
         snprintf_P(buf, sizeof(buf), PSTR("NOTICE <%s> %s"), from, message);
         ircDebug(buf);
@@ -378,7 +404,7 @@ boolean parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a
           pch = strstr_P(message, "This nickname is registered and protected.");
           if (pch != NULL) {
             _irc_identified = NOT_IDENTIFIED;
-			#ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+			#ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
             ircDebug(F("Nickserv wants auth."));
             if (strlen(_nickserv_password) == 0) {
               ircDebug(F("WARNING: No nickserv password is set!\r\n"));
@@ -392,19 +418,19 @@ boolean parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a
           return true;
 	    }
         //some other private notice
-        #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+        #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
         snprintf_P(buf, sizeof(buf), PSTR("Got private notice from <%s> %s"), from, message);
         ircDebug(buf);
         #endif
         ircOnPrivateNotice(from, message);
       } else {  //channel notice
-        #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+        #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
         char buf[100];
         snprintf_P(buf, sizeof(buf), PSTR("%s <%s> NOTICE: %s"), to, from, message);
         ircDebug(buf);
         #endif
         if (strcmp(to, "AUTH") == 0) { //this is an AUTH notice
-          #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+          #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
           char buf[100];
           snprintf_P(buf, sizeof(buf), PSTR("Ignoring AUTH NOTICE: %s"), message);
           ircDebug(buf);
@@ -416,7 +442,7 @@ boolean parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a
 
       }
     } else if (strcmp(type, "JOIN") == 0) {  //we have a JOIN
-      #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+      #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
       char buf[100];
       snprintf_P(buf, sizeof(buf), PSTR("%s joined %s"), from, to+1);
       ircDebug(buf);
@@ -429,7 +455,7 @@ boolean parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a
         snprintf_P(buf, sizeof(buf), PSTR("Our nick is now %s"), _irc_nick);
         ircDebug(buf);
       } else {
-        #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+        #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
         char buf[100];
         snprintf_P(buf, sizeof(buf), PSTR("%s changed nick to %s"), from, to+1);
         ircDebug(buf);
@@ -438,7 +464,7 @@ boolean parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a
       ircOnNickChange(from, to+1);
       return true;
     } else if (strcmp(type, "MODE") == 0) {  //we have a MODE
-      #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+      #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
       char buf[100];
       snprintf_P(buf, sizeof(buf), PSTR("%s set mode: %s on %s"), from, message, to);
       ircDebug(buf);
@@ -448,7 +474,7 @@ boolean parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a
       strcat(test_string, _irc_nick);
       pch = strstr_P(message, test_string);
       if (pch != NULL) {
-        #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+        #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
         char buf[100];
         snprintf_P(buf, sizeof(buf), PSTR("Got voice on %s"), to);
         ircDebug(buf);
@@ -460,7 +486,7 @@ boolean parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a
       strcat(test_string, _irc_nick);
       pch = strstr_P(message, test_string);
       if (pch != NULL) {
-        #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+        #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
         char buf[100];
         snprintf_P(buf, sizeof(buf), PSTR("Got ops on %s"), to);
         ircDebug(buf);
@@ -471,14 +497,14 @@ boolean parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a
       //handle other mode here?
       return false;
     } else if (strcmp(type, "301") == 0) {  //user is AWAY
-      #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+      #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
       char buf[100];
       snprintf_P(buf, sizeof(buf), PSTR("RPL_AWAY: %s"), message);
       ircDebug(buf);
       #endif
       return true;
     } else if (strcmp(type, "305") == 0 && strcmp(to, _irc_nick) == 0) {  //we are no longer AWAY
-      #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+      #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
       char buf[100];
       snprintf_P(buf, sizeof(buf), PSTR("RPL_UNAWAY: %s"), message);
       ircDebug(buf);
@@ -486,7 +512,7 @@ boolean parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a
       _irc_away_status = false;
       return true;
     } else if (strcmp(type, "306") == 0 && strcmp(to, _irc_nick) == 0) {  //we are now AWAY
-      #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+      #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
       char buf[100];
       snprintf_P(buf, sizeof(buf), PSTR("RPL_NOWAWAY: %s"), message);
       ircDebug(buf);
@@ -530,7 +556,7 @@ boolean parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a
     _irc_last_line_from_server = millis();
     char ping_string[31];
     strlcpy (ping_string, pch+6, 30);
-    #ifdef DEBUG_IRC
+    #ifdef IRC_DEBUG
     char buf[100];
     snprintf_P(buf, sizeof(buf), PSTR("Got ping: %s, sending pong"), ping_string);
     ircDebug(buf);
@@ -729,7 +755,7 @@ void setAway() {
 void setAway(const char *message) {
   if (!_irc_away_status && _irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
 	if (millis() - _irc_last_away >= IRC_RATE_LIMIT) {
-	  #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+	  #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
       char buf[100];
       snprintf_P(buf, sizeof(buf), PSTR("Setting AWAY: %s"), message);
       ircDebug(buf);
@@ -741,7 +767,7 @@ void setAway(const char *message) {
       _irc_last_line_from_server = millis();
 	  _irc_last_away = millis();
     } else {
-      #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+      #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
       ircDebug(F("Not setting AWAY: Rate limited."));
       #endif
     }
@@ -751,7 +777,7 @@ void setAway(const char *message) {
 void setAway(const __FlashStringHelper *message) {
   if (!_irc_away_status && _irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
     if ( millis() - _irc_last_away >= IRC_RATE_LIMIT) {
-      #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+      #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
       char buf[100];
       snprintf_P(buf, sizeof(buf), PSTR("Setting AWAY: %s"), FPSTR((PGM_P)message));
       ircDebug(buf);
@@ -763,7 +789,7 @@ void setAway(const __FlashStringHelper *message) {
       _irc_last_line_from_server = millis();
      _irc_last_away = millis();
     } else {
-      #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+      #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
       ircDebug(F("Not setting AWAY: Rate limited."));
       #endif
     }
@@ -773,7 +799,7 @@ void setAway(const __FlashStringHelper *message) {
 void unAway() {
   if (_irc_away_status && _irc_ethClient != NULL && _irc_ethClient->connected() && _irc_pinged) {
 	if (millis() - _irc_last_away >= IRC_RATE_LIMIT) {
-	  #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+	  #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
       ircDebug(F("Setting UNAWAY"));
       #endif
       ircNetworkLight();
@@ -781,7 +807,7 @@ void unAway() {
       _irc_last_line_from_server = millis();
 	  _irc_last_away = millis();
     } else {
-      #ifdef DEBUG_IRC || DEBUG_IRC_VERBOSE
+      #ifdef IRC_DEBUG || IRC_DEBUG_VERBOSE
       ircDebug(F("Not setting UNAWAY: Rate limited."));
       #endif
     }
@@ -883,7 +909,7 @@ void ircOnPrivateMessage(const char * from, const char * message) {
   if( 0 != fpOnPrivateMessage ) {
     (*fpOnPrivateMessage)(from, message);
   } else {
-    #ifdef DEBUG_IRC_VERBOSE
+    #ifdef IRC_DEBUG_VERBOSE
     char buf[100];
     snprintf_P(buf, sizeof(buf), PSTR("No callback set for private message!"), from);
     ircDebug(buf);
@@ -899,7 +925,7 @@ void ircOnChannelMessage(const char * from, const char * channel, const char * m
   if( 0 != fpOnChannelMessage ) {
     (*fpOnChannelMessage)(from, channel, message);
   } else {
-    #ifdef DEBUG_IRC_VERBOSE
+    #ifdef IRC_DEBUG_VERBOSE
     char buf[100];
     snprintf_P(buf, sizeof(buf), PSTR("No callback set for channel message!"), from);
     ircDebug(buf);
@@ -915,7 +941,7 @@ void ircOnPrivateNotice(const char * from, const char * message) {
   if( 0 != fpOnPrivateNotice ) {
     (*fpOnPrivateNotice)(from, message);
   } else {
-    #ifdef DEBUG_IRC_VERBOSE
+    #ifdef IRC_DEBUG_VERBOSE
 	char buf[100];
     snprintf_P(buf, sizeof(buf), PSTR("No callback set for private NOTICE!"), from);
     ircDebug(buf);
@@ -931,7 +957,7 @@ void ircOnChannelNotice(const char * from, const char * channel, const char * me
   if( 0 != fpOnChannelNotice ) {
     (*fpOnChannelNotice)(from, channel, message);
   } else {
-    #ifdef DEBUG_IRC_VERBOSE
+    #ifdef IRC_DEBUG_VERBOSE
 	char buf[100];
     snprintf_P(buf, sizeof(buf), PSTR("No callback set for channel NOTICE!"), from);
     ircDebug(buf);
@@ -953,14 +979,14 @@ void ircOnCTCP(const char * from, const char * to, const char * message) {
   pch = strstr_P(message,"ACTION");
   if (pch == &message[0]) {  //respond to CTCP ACTION
     char buf[100];
-    #ifdef DEBUG_IRC
+    #ifdef IRC_DEBUG
     snprintf_P(buf, sizeof(buf), PSTR("* %s %s"), from, message+7);
     ircDebug(buf);
     #endif
     if( 0 != fpOnAction ) {
       (*fpOnAction)(from, to, message+7);
   	} else {
-      #ifdef DEBUG_IRC_VERBOSE
+      #ifdef IRC_DEBUG_VERBOSE
       snprintf_P(buf, sizeof(buf), PSTR("No callback set for CTCP ACTION!"), from);
       ircDebug(buf);
 	  #endif
@@ -970,7 +996,7 @@ void ircOnCTCP(const char * from, const char * to, const char * message) {
   pch = strstr_P(message,"VERSION");
   if (pch == &message[0]) {  //respond to CTCP VERSION request
 	char buf[100];
-    #ifdef DEBUG_IRC
+    #ifdef IRC_DEBUG
     snprintf_P(buf, sizeof(buf), PSTR("Got CTCP VERSION request from <%s>"), from);
     ircDebug(buf);
     #endif
@@ -981,7 +1007,7 @@ void ircOnCTCP(const char * from, const char * to, const char * message) {
   pch = strstr_P(message,"FINGER");
   if (pch == &message[0]) {  //respond to CTCP FINGER request
     char buf[100];
-    #ifdef DEBUG_IRC
+    #ifdef IRC_DEBUG
     snprintf_P(buf, sizeof(buf), PSTR("Got CTCP FINGER request from <%s>"), from);
     ircDebug(buf);
     #endif
@@ -992,7 +1018,7 @@ void ircOnCTCP(const char * from, const char * to, const char * message) {
   pch = strstr_P(message,"PING");
   if (pch == &message[0]) {  //respond to CTCP PING request
 	char buf[100];
-    #ifdef DEBUG_IRC
+    #ifdef IRC_DEBUG
     snprintf_P(buf, sizeof(buf), PSTR("Got CTCP PING request from <%s>"), from);
     ircDebug(buf);
     #endif
@@ -1003,7 +1029,7 @@ void ircOnCTCP(const char * from, const char * to, const char * message) {
   pch = strstr_P(message,"CLIENTINFO");
   if (pch == &message[0]) {  //respond to CTCP CLIENTINFO
     char buf[100];
-    #ifdef DEBUG_IRC
+    #ifdef IRC_DEBUG
     snprintf_P(buf, sizeof(buf), PSTR("Got CTCP CLIENTINFO request from <%s>"), from);
     ircDebug(buf);
     #endif
@@ -1014,7 +1040,7 @@ void ircOnCTCP(const char * from, const char * to, const char * message) {
   pch = strstr_P(message,"TIME");
   if (pch == &message[0]) {  //respond to CTCP TIME
     char buf[100];
-    #ifdef DEBUG_IRC
+    #ifdef IRC_DEBUG
     snprintf_P(buf, sizeof(buf), PSTR("Got CTCP TIME request from <%s>"), from);
     ircDebug(buf);
     #endif
@@ -1034,7 +1060,7 @@ void ircOnCTCP(const char * from, const char * to, const char * message) {
   if (0 != fpOnCTCP ) {
     (*fpOnCTCP)(from, to, message);
   } else {
-    #ifdef DEBUG_IRC_VERBOSE
+    #ifdef IRC_DEBUG_VERBOSE
     char buf[100];
     snprintf_P(buf, sizeof(buf), PSTR("No callback set for CTCP!"), from);
     ircDebug(buf);

@@ -19,6 +19,8 @@ const char * ircNick();
 
 void ircSetVersion(const char * version);
 
+void ircSetServerPassword(const char * password);
+
 void ircSetNickServPassword(const char * password);
 
 void doIRC();
