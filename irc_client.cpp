@@ -1,3 +1,4 @@
+#VERSION 20220218.1
 #include "irc_client.h"
 #include <Client.h>
 
@@ -84,36 +85,7 @@ boolean ircConnect(const char * server, int port, boolean reconnect) {
     _irc_identified = WAITING_FOR_NICKSERV;
     memset(_irc_input_buffer, 0, sizeof(_irc_input_buffer));
     _irc_input_buffer_pointer = 0;
-    if (_irc_ethClient->connect(server, port)) {
-      _irc_last_line_from_server = millis();
-      ircNetworkLight();
-      snprintf_P(buf, sizeof(buf), PSTR("Connected to %s:%u"), server, port);
-      ircDebug(buf);
-      if (strlen(_irc_server_password)) {
-        #ifdef IRC_DEBUG
-        snprintf_P(buf, sizeof(buf), PSTR("Using server password \"%s\""), _irc_server_password);
-        ircDebug(buf);
-        #endif
-        _irc_ethClient->print(F("PASS "));
-        _irc_ethClient->print(_irc_server_password);
-        _irc_ethClient->print(F("\r\n"));
-      }
-      _irc_ethClient->print(F("NICK "));
-      _irc_ethClient->print(_irc_nick);
-      _irc_ethClient->print(F("\r\nUSER "));
-	  //remove illegal characters from username
-	  snprintf(buf, sizeof(buf), "%s", _irc_nick);
-	  stringRemoveNonPermitted(buf);
-      _irc_ethClient->print(buf);
-      _irc_ethClient->print(F(" 8 * :"));
-      _irc_ethClient->print(_version);
-      _irc_ethClient->print(F("\r\n"));
-      return(true);
-    } else {
-      snprintf_P(buf, sizeof(buf), PSTR("Connection failed!"));
-      ircDebug(buf);
-      return(false);
-    }
+    return(ircConnectChat(server, port));
   } else {
     ircDebug(F("Already connected!"));
     return(true);
@@ -186,33 +158,7 @@ void doIRC() {
     _irc_identified = WAITING_FOR_NICKSERV;
     memset(_irc_input_buffer, 0, sizeof(_irc_input_buffer));
     _irc_input_buffer_pointer = 0;
-    if (_irc_ethClient->connect(_irc_server, _irc_server_port)) {
-      _irc_last_line_from_server = millis();
-      ircNetworkLight();
-      snprintf_P(buf, sizeof(buf), PSTR("Connected to %s:%u"), _irc_server, _irc_server_port);
-      ircDebug(buf);
-      if (strlen(_irc_server_password)) {
-		#ifdef IRC_DEBUG
-        snprintf_P(buf, sizeof(buf), PSTR("Using server password \"%s\""), _irc_server_password);
-        ircDebug(buf);
-        #endif
-        _irc_ethClient->print(F("PASS "));
-        _irc_ethClient->print(_irc_server_password);
-        _irc_ethClient->print(F("\r\n"));
-      }
-      _irc_ethClient->print(F("NICK "));
-      _irc_ethClient->print(_irc_nick);
-      _irc_ethClient->print(F("\r\nUSER "));
-      //remove illegal characters from username
-      snprintf(buf, sizeof(buf), "%s", _irc_nick);
-      stringRemoveNonPermitted(buf);
-      _irc_ethClient->print(buf);
-      _irc_ethClient->print(F(" 8 * :"));
-      _irc_ethClient->print(_version);
-      _irc_ethClient->print(F("\r\n"));
-    } else {
-      snprintf_P(buf, sizeof(buf), PSTR("Connection failed!"));
-      ircDebug(buf);
+    if (!ircConnectChat(_irc_server, _irc_server_port)) {
       ircOnDisconnect();
     }
   }
@@ -413,7 +359,7 @@ boolean parseIRCInput(boolean buffer_overflow) {  //_irc_input_buffer contains a
             return true;
           }
           char buf[100];
-          snprintf_P(buf, sizeof(buf), PSTR("Ignoring NiceServ NOTICE: %s"), message);
+          snprintf_P(buf, sizeof(buf), PSTR("Ignoring NickServ NOTICE: %s"), message);
           ircDebug(buf);
           return true;
 	    }
@@ -1146,6 +1092,40 @@ void ircDebug(const char *line) {
     (*fpDebug)(line);
   } else {
     //do nothing
+  }
+}
+
+boolean ircConnectChat(const char * server, int port) {
+  char buf[100];
+  if (_irc_ethClient->connect(server, port)) {
+    _irc_last_line_from_server = millis();
+    ircNetworkLight();
+    snprintf_P(buf, sizeof(buf), PSTR("Connected to %s:%u"), server, port);
+    ircDebug(buf);
+    if (strlen(_irc_server_password)) {
+      #ifdef IRC_DEBUG
+      snprintf_P(buf, sizeof(buf), PSTR("Using server password \"%s\""), _irc_server_password);
+      ircDebug(buf);
+      #endif
+      _irc_ethClient->print(F("PASS "));
+      _irc_ethClient->print(_irc_server_password);
+      _irc_ethClient->print(F("\r\n"));
+    }
+    _irc_ethClient->print(F("NICK "));
+    _irc_ethClient->print(_irc_nick);
+    _irc_ethClient->print(F("\r\nUSER "));
+    //remove illegal characters from username
+    snprintf(buf, sizeof(buf), "%s", _irc_nick);
+    stringRemoveNonPermitted(buf);
+    _irc_ethClient->print(buf);
+    _irc_ethClient->print(F(" 8 * :"));
+    _irc_ethClient->print(_version);
+    _irc_ethClient->print(F("\r\n"));
+    return(true);
+  } else {
+    snprintf_P(buf, sizeof(buf), PSTR("Connection failed!"));
+    ircDebug(buf);
+    return(false);
   }
 }
 

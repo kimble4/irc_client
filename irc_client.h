@@ -133,6 +133,8 @@ void ircDebug (const char *line);
 
 void ircSetDebug(void (*fp)(const char *));
 
+boolean ircConnectChat(const char * server, int port);
+
 void stringRemoveNonPermitted(char *str);
 
 #endif
