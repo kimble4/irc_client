@@ -1,4 +1,4 @@
-#VERSION 20220218.1
+#define IRC_CLIENT_VERSION 20220510.1
 #include "irc_client.h"
 #include <Client.h>
 
@@ -1116,7 +1116,7 @@ boolean ircConnectChat(const char * server, int port) {
     _irc_ethClient->print(F("\r\nUSER "));
     //remove illegal characters from username
     snprintf(buf, sizeof(buf), "%s", _irc_nick);
-    stringRemoveNonPermitted(buf);
+    ircStringRemoveNonPermitted(buf);
     _irc_ethClient->print(buf);
     _irc_ethClient->print(F(" 8 * :"));
     _irc_ethClient->print(_version);
@@ -1129,14 +1129,82 @@ boolean ircConnectChat(const char * server, int port) {
   }
 }
 
-void stringRemoveNonPermitted(char *str) {
-    unsigned long i = 0;
-    unsigned long j = 0;
-    char c;
-    while ((c = str[i++]) != '\0') {
-        if (isalnum(c) || c == '-' || c == '.' | c == '_') {
-            str[j++] = c;
-        }
+void ircStringRemoveNonPermitted(char * str) {
+  unsigned long i = 0;
+  unsigned long j = 0;
+  char c;
+  while ((c = str[i++]) != '\0') {
+    if (isalnum(c) || c == '-' || c == '.' | c == '_') {
+      str[j++] = c;
     }
-    str[j] = '\0';
+  }
+  str[j] = '\0';
+}
+
+void ircStringRemoveFormatting(char * str) {
+  unsigned long i = 0;
+  unsigned long j = 0;
+  char c;
+  while ((c = str[i++]) != '\0') {
+    if (c == '\u000f' || c == '\u0002' || c == '\u001f' || c == '\u0016') {
+      //skip this char
+    } else {
+      str[j++] = c;
+    }
+  }
+  str[j] = '\0';
+}
+
+void ircStringRemoveColours(char * str) {
+  unsigned long i = 0;
+  unsigned long j = 0;
+  char c;
+  while ((c = str[i++]) != '\0') {
+  	if (c == '\u0003') {
+      c = str[++i];
+      // Skip "x" or "xy" (foreground color).
+      if (c != '\0') {
+        if (isDigit(c)) {
+		  c = str[++i];
+          if (c != '\0') {
+            if (isDigit(c)) {
+              c = str[++i];
+            }
+          }
+        }
+        // Now skip ",x" or ",xy" (background color).
+        if (c != '\0') {
+	      if (c == ',') {
+            c = str[++i];
+            if (c != '\0') {
+              if (isDigit(c)) {
+                c = str[++i];
+                if (c != '\0') {
+                  if (isDigit(c)) {
+                    c = str[++i];
+                  }
+                }
+              } else {
+                // Keep the comma.
+				c = str[--i];
+              }
+            } else {
+              // Keep the comma.
+			  c = str[--i];
+            }
+          }
+        }
+      }
+    } else if (c == '\u000f') {
+      //skip
+    } else {
+      str[j++] = c;
+    }
+  }
+  str[j] = '\0';
+}
+
+void ircStringRemoveFormattingAndColours(char * str) {
+  ircStringRemoveColours(str);
+  ircStringRemoveFormatting(str);
 }
