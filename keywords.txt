@@ -11,13 +11,13 @@ ircSetVersion	KEYWORD2
 ircSetServerPassword	KEYWORD2
 ircSetNickServPassword	KEYWORD2
 doIRC	KEYWORD2
-joinIRCChannel	KEYWORD2
+ircJoinChannel	KEYWORD2
 ircSendMessage	KEYWORD2
 ircSendNotice	KEYWORD2
 ircSendCTCP	KEYWORD2
 ircSendAction	KEYWORD2
-setAway	KEYWORD2
-unAway	KEYWORD2
+ircAway	KEYWORD2
+ircUnAway	KEYWORD2
 ircConnected	KEYWORD2
 ircMode	KEYWORD2
 ircDisconnect	KEYWORD2
