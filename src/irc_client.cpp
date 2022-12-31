@@ -843,7 +843,7 @@ void ircOnDisconnect() {
   if( 0 != fpOnDisconnect ) {
 	(*fpOnDisconnect)();
   } else {
-	//do noting
+	//do nothing
   }
 }
 
