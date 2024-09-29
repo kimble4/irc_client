@@ -1,4 +1,4 @@
-#define IRC_CLIENT_VERSION 20220921.1
+#define IRC_CLIENT_VERSION 20240929.1
 #include "irc_client.h"
 #include <Client.h>
 
@@ -33,7 +33,7 @@ unsigned long _irc_line_start_time = 0;
 const char * _irc_server_password = "";
 const char * _nickserv_password = "";
 char _irc_nick[IRC_NICK_MAX_LENGTH + 1] = "irc_client";
-const char * _version = "";
+const char * _version = "Arduino IRC client";
 const char * _irc_server = "";
 int _irc_server_port = 6667;
 
